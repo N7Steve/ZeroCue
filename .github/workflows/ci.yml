@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: ZeroCue.DataProbe/packages.lock.json
+
+      - name: Verify .NET SDK
+        run: dotnet --version
+
+      - name: Restore locked dependencies
+        run: dotnet restore ZeroCue.DataProbe/ZeroCue.DataProbe.csproj --locked-mode
+
+      - name: Verify bundled runtime assets
+        shell: pwsh
+        run: ./scripts/verify-runtime-assets.ps1
+
+      - name: Verify driver restoration boundaries
+        shell: pwsh
+        run: ./scripts/verify-driver-safety.ps1
+
+      - name: Audit dependency and runtime licenses
+        shell: pwsh
+        run: ./scripts/collect-third-party-notices.ps1 -DestinationRoot "$env:RUNNER_TEMP\zerocue-license-audit"
+
+      - name: Build
+        run: dotnet build ZeroCue.DataProbe/ZeroCue.DataProbe.csproj --configuration Release --no-restore
+
+      - name: Audit NuGet packages
+        run: dotnet list ZeroCue.DataProbe/ZeroCue.DataProbe.csproj package --vulnerable --include-transitive

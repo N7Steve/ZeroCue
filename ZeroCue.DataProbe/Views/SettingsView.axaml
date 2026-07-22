@@ -1,0 +1,189 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ZeroCue.DataProbe.ViewModels"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:DataType="vm:MainViewModel"
+             x:Class="ZeroCue.DataProbe.Views.SettingsView">
+    <UserControl.Styles>
+        <Style Selector="Border.driverCard">
+            <Setter Property="Background" Value="{DynamicResource AltPanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16"/>
+        </Style>
+
+        <Style Selector="Button.driverPrimaryButton">
+            <Setter Property="Background" Value="{DynamicResource PrimaryActionColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="MinWidth" Value="138"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Button.driverDangerButton">
+            <Setter Property="Background" Value="{DynamicResource ErrorColor}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="MinWidth" Value="138"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Border.driverHelper">
+            <Setter Property="Background" Value="{DynamicResource AppBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="14"/>
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="30" Spacing="18" MaxWidth="920">
+            <TextBlock Text="{DynamicResource SettingsTitle}" Foreground="White" FontSize="28" FontWeight="Bold"/>
+
+            <Border Background="{DynamicResource PanelBackgroundColor}" Padding="20" CornerRadius="8" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="{DynamicResource AppSettings}" Foreground="White" FontSize="20" FontWeight="SemiBold"/>
+                    <Border Height="1" Background="{DynamicResource BorderColor}" Margin="0,2,0,6"/>
+
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <TextBlock Text="{DynamicResource Language}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="16" VerticalAlignment="Center" />
+                        <ComboBox ItemsSource="{Binding LanguageOptions}"
+                                  SelectedIndex="{Binding SelectedLanguageIndex}"
+                                  Width="220"
+                                  Background="{DynamicResource AppBackgroundColor}"
+                                  Foreground="{DynamicResource TextPrimaryColor}"
+                                  BorderBrush="{DynamicResource BorderColor}" />
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <TextBlock Text="{DynamicResource Theme}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="16" VerticalAlignment="Center" />
+                        <ComboBox ItemsSource="{Binding ThemeOptions}"
+                                  SelectedIndex="{Binding SelectedThemeIndex}"
+                                  Width="220"
+                                  Background="{DynamicResource AppBackgroundColor}"
+                                  Foreground="{DynamicResource TextPrimaryColor}"
+                                  BorderBrush="{DynamicResource BorderColor}" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{DynamicResource BorderColor}" Margin="0,4,0,2"/>
+
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{DynamicResource StartupSettings}" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource StartWithWindows}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="15"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartWithWindows}" OffContent="{DynamicResource Disabled}" OnContent="{DynamicResource Enabled}" Foreground="{DynamicResource TextPrimaryColor}" VerticalAlignment="Center" Margin="18,0,0,0"/>
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource StartMinimized}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="15"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartMinimized}" OffContent="{DynamicResource Disabled}" OnContent="{DynamicResource Enabled}" Foreground="{DynamicResource TextPrimaryColor}" VerticalAlignment="Center" Margin="18,0,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Background="{DynamicResource PanelBackgroundColor}" Padding="20" CornerRadius="8" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="{DynamicResource WinUsbDrivers}" Foreground="White" FontSize="20" FontWeight="SemiBold"/>
+                    <Border Height="1" Background="{DynamicResource BorderColor}" Margin="0,2,0,2"/>
+
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{DynamicResource WinUsbUsageHelper}"
+                                   Foreground="{DynamicResource TextSecondaryColor}"
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   LineHeight="19"/>
+
+                        <Border Classes="driverHelper">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Border Grid.Column="0" Width="34" Height="34" CornerRadius="8" Background="{DynamicResource AccentSemiTransparentColor}" VerticalAlignment="Top">
+                                    <materialIcons:MaterialIcon Kind="HelpCircleOutline" Width="20" Height="20" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+
+                                <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="4">
+                                    <TextBlock Text="{DynamicResource WinUsbWhatIsTitle}"
+                                               Foreground="{DynamicResource TextPrimaryColor}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"/>
+                                    <TextBlock Text="{DynamicResource WinUsbWhatIsDescription}"
+                                               Foreground="{DynamicResource TextSecondaryColor}"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"
+                                               LineHeight="18"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Spacing="12">
+                        <Border Classes="driverCard">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                                    <Border Width="46" Height="46" CornerRadius="8" Background="{DynamicResource AccentSemiTransparentColor}">
+                                        <materialIcons:MaterialIcon Kind="GamepadVariant" Width="26" Height="26" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="{DynamicResource UsbController}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <Button Classes="driverPrimaryButton" Command="{Binding InstallDriverCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <materialIcons:MaterialIcon Kind="Download" Width="17" Height="17" Foreground="White" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{DynamicResource InstallWinUsb}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Classes="driverDangerButton" Command="{Binding RestoreDriverCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <materialIcons:MaterialIcon Kind="BackupRestore" Width="17" Height="17" Foreground="White" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{DynamicResource RestoreDrivers}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="driverCard">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                                    <Border Width="46" Height="46" CornerRadius="8" Background="{DynamicResource AccentSemiTransparentColor}">
+                                        <materialIcons:MaterialIcon Kind="AccessPoint" Width="26" Height="26" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="{DynamicResource RfReceiver}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                    <Button Classes="driverPrimaryButton" Command="{Binding InstallReceiverDriverCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <materialIcons:MaterialIcon Kind="Download" Width="17" Height="17" Foreground="White" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{DynamicResource InstallWinUsb}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Classes="driverDangerButton" Command="{Binding RestoreReceiverDriverCommand}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <materialIcons:MaterialIcon Kind="BackupRestore" Width="17" Height="17" Foreground="White" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{DynamicResource RestoreDrivers}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

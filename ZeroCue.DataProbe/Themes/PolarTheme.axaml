@@ -1,0 +1,59 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Fondos y Paneles -->
+    <SolidColorBrush x:Key="AppBackgroundColor">#111722</SolidColorBrush>
+    <SolidColorBrush x:Key="PanelBackgroundColor">#1B2432</SolidColorBrush>
+    <SolidColorBrush x:Key="SidebarBackgroundColor">#151D29</SolidColorBrush>
+    <SolidColorBrush x:Key="OverlayBackgroundColor">#E6111722</SolidColorBrush>
+    <SolidColorBrush x:Key="AltPanelBackgroundColor">#263246</SolidColorBrush>
+    <SolidColorBrush x:Key="HeaderBackgroundColor">#30405A</SolidColorBrush>
+
+    <!-- Bordes y Divisores -->
+    <SolidColorBrush x:Key="BorderColor">#3D4C65</SolidColorBrush>
+    <SolidColorBrush x:Key="BorderHighlightColor">#5B6F90</SolidColorBrush>
+
+    <!-- Textos -->
+    <SolidColorBrush x:Key="TextPrimaryColor">#F7FBFF</SolidColorBrush>
+    <SolidColorBrush x:Key="TextHeaderColor">#FFFFFF</SolidColorBrush>
+    <SolidColorBrush x:Key="TextSecondaryColor">#B9C8D9</SolidColorBrush>
+    <SolidColorBrush x:Key="TextMutedColor">#7D8DA3</SolidColorBrush>
+    <SolidColorBrush x:Key="TextHighlightColor">#E5F1FF</SolidColorBrush>
+
+    <!-- Color de Acento -->
+    <SolidColorBrush x:Key="AccentColor">#8BD3FF</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentHoverColor">#263F58</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentSemiTransparentColor">#338BD3FF</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentTransparentColor">#668BD3FF</SolidColorBrush>
+
+    <!-- Colores RGB para controles de luz -->
+    <SolidColorBrush x:Key="RgbRedColor">#FF6E7F</SolidColorBrush>
+    <SolidColorBrush x:Key="RgbGreenColor">#80F2C8</SolidColorBrush>
+    <SolidColorBrush x:Key="RgbBlueColor">#8BD3FF</SolidColorBrush>
+
+    <!-- Colores de Estado (Botones predeterminados de ABXY) -->
+    <SolidColorBrush x:Key="BtnAColor">#80F2C8</SolidColorBrush>
+    <SolidColorBrush x:Key="BtnBColor">#FF6E7F</SolidColorBrush>
+    <SolidColorBrush x:Key="BtnXColor">#8BD3FF</SolidColorBrush>
+    <SolidColorBrush x:Key="BtnYColor">#FFE08A</SolidColorBrush>
+    <SolidColorBrush x:Key="ErrorColor">#E85D75</SolidColorBrush>
+    <SolidColorBrush x:Key="PrimaryActionColor">#5AAAD8</SolidColorBrush>
+
+    <!-- Mappings y Vectores -->
+    <SolidColorBrush x:Key="ActiveMappingColor">#315E78</SolidColorBrush>
+    <SolidColorBrush x:Key="InactiveMappingColor">#516075</SolidColorBrush>
+    <SolidColorBrush x:Key="ControllerBodyColor">#3E506A</SolidColorBrush>
+
+    <!-- Transparencias de Acento -->
+    <SolidColorBrush x:Key="AccentFillSemi">#448BD3FF</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentFillHigh">#778BD3FF</SolidColorBrush>
+    <Color x:Key="AccentGlowStartColor">#888BD3FF</Color>
+    <Color x:Key="AccentGlowEndColor">#008BD3FF</Color>
+
+    <!-- Ring Color -->
+    <SolidColorBrush x:Key="ConnectedRingColor">#4080F2C8</SolidColorBrush>
+    <SolidColorBrush x:Key="ConnectedDotColor">#80F2C8</SolidColorBrush>
+
+    <!-- Toggles -->
+    <SolidColorBrush x:Key="ToggleContainerColor">#151D29</SolidColorBrush>
+    <SolidColorBrush x:Key="ToggleCapsuleColor">#203247</SolidColorBrush>
+</ResourceDictionary>

@@ -1,0 +1,464 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ZeroCue.DataProbe.ViewModels"
+             xmlns:conv="using:ZeroCue.DataProbe.Converters"
+             x:Class="ZeroCue.DataProbe.Views.XboxControllerVectorView"
+             x:DataType="vm:MainViewModel">
+
+    <UserControl.Resources>
+        <conv:RemapBrushConverter x:Key="RemapBrushConverter"/>
+        <conv:RemapTooltipConverter x:Key="RemapTooltipConverter"/>
+        <conv:RemapContentConverter x:Key="RemapContentConverter"/>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Button.remapBtn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.remapBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSemiTransparentColor}"/>
+        </Style>
+        <Style Selector="Button.remapBtn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTransparentColor}"/>
+        </Style>
+
+        <Style Selector="TextBlock.mapText">
+            <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+            <Setter Property="FontSize" Value="48"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.mapLabel">
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+            <Setter Property="FontSize" Value="42"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Segoe UI, Inter, Arial"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.systemButtonLabel">
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+            <Setter Property="FontSize" Value="26"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Segoe UI, Inter, Arial"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+        </Style>
+
+        <Style Selector="Polyline.mapLine">
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Stroke" Value="{DynamicResource TextMutedColor}"/>
+            <Setter Property="StrokeThickness" Value="3"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+        </Style>
+        <Style Selector="Ellipse.mapDot">
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Fill" Value="{DynamicResource TextHeaderColor}"/>
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+        </Style>
+
+                        <Style Selector="Button.labelBtn /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.08" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.08" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.labelBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+        <Style Selector="Button.labelBtn.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ActiveMappingColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+
+        <Style Selector="Button.pathRemapBtn">
+            <Setter Property="Background" Value="{x:Null}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{TemplateBinding Background}" />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.pathRemapBtn :is(Shape).btnPath">
+            <Setter Property="Fill" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.pathRemapBtn :is(Shape).btnPath">
+            <Setter Property="Fill" Value="Transparent" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.pathRemapBtn:pointerover :is(Shape).btnPath">
+            <Setter Property="Fill" Value="{DynamicResource AccentFillSemi}"/>
+        </Style>
+        <Style Selector="Button.pathRemapBtn.active :is(Shape).btnPath">
+            <Setter Property="Fill" Value="{DynamicResource AccentFillSemi}"/>
+        </Style>
+        <Style Selector="Button.pathRemapBtn:pressed :is(Shape).btnPath">
+            <Setter Property="Fill" Value="{DynamicResource AccentFillHigh}"/>
+        </Style>
+
+
+        <Style Selector="Button.dpadUp :is(Shape).btnPath">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadUp:pointerover :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadUp.active :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadDown :is(Shape).btnPath">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadDown:pointerover :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="50%,100%" EndPoint="50%,0%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadDown.active :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="50%,100%" EndPoint="50%,0%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadLeft :is(Shape).btnPath">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadLeft:pointerover :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadLeft.active :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadRight :is(Shape).btnPath">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadRight:pointerover :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="100%,50%" EndPoint="0%,50%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadRight.active :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="100%,50%" EndPoint="0%,50%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
+                        <Style Selector="Button.labelBtn, Button.circleLabelBtn">
+            <Setter Property="Background" Value="{DynamicResource InactiveMappingColor}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="4"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="Width" Value="100"/>
+            <Setter Property="Height" Value="100"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.circleLabelBtn /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.08" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.08" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.circleLabelBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+        <Style Selector="Button.circleLabelBtn.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ActiveMappingColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+        <Style Selector="Button.modeSegment">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#8A94A6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="FontSize" Value="44"/>
+            <Setter Property="CornerRadius" Value="30"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.modeSegment:pointerover">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+        </Style>
+        <Style Selector="Button.modeSegment.active">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+</UserControl.Styles>
+
+<Grid RowDefinitions="*, Auto">
+    <Viewbox Grid.Row="0" Stretch="Uniform" Margin="0">
+        <Panel Width="2480" Height="1740" ClipToBounds="False">
+            <Canvas Width="2508" Height="2508" Margin="0, -360, 0, 0" HorizontalAlignment="Left" VerticalAlignment="Top">
+<!-- VISUAL BACKGROUND (ALL PATHS) -->
+<Path Fill="#5E6982" Opacity="1">
+  <Path.Data>
+    <GeometryGroup FillRule="NonZero">
+      <PathGeometry Figures="M 1694.46 484.38 C 1711.49 451.622 1730.19 389.445 1759.95 373.518 C 1787.03 359.022 1826.95 365.077 1855.25 372.696 C 1936.21 394.493 1989.99 485.514 2028.22 556.611 C 2076.47 584.874 2078.28 610.96 2087.96 663.216 C 2137 708.437 2159.07 790.895 2182.9 852.971 C 2205.36 912.314 2226.69 972.076 2246.88 1032.23 C 2306.68 1207.16 2359.12 1385.97 2391.73 1568.29 C 2420.15 1727.14 2458.23 1942.21 2309.75 2055.96 C 2272.93 2084.17 2214.54 2106.2 2167.67 2099.24 C 2145.6 2096.09 2124.95 2086.53 2108.26 2071.75 C 2092.83 2058.19 2075.66 2034.69 2062.9 2018 L 2014.65 1954.47 L 1852.69 1738.46 C 1841.74 1723.64 1829.15 1705.9 1817.17 1692.08 C 1779.31 1648.69 1725.66 1622.24 1668.18 1618.64 C 1647.98 1617.37 1622.96 1617.99 1602.46 1617.99 L 1493.2 1618 L 1153.03 1618.02 L 932.882 1618.06 C 856.073 1618.04 782.974 1609.83 716.509 1656.34 C 671.841 1687.59 638.521 1741.09 605.866 1784.65 C 556.336 1851.06 506.469 1917.21 456.265 1983.11 C 434.912 2011 407.992 2048.62 383.142 2071.95 C 359.267 2093.03 327.693 2104.24 296.047 2100.36 C 120.727 2078.85 57.515 1912.62 73.2396 1755.9 C 83.8081 1650.57 99.5683 1557.38 124.101 1456.06 C 173.41 1252.43 238.391 1053.32 313.065 858.062 L 345.65 773.942 C 363.824 727.452 374.239 694.928 413.391 661.289 C 419.438 626.521 423.32 594.367 451.889 570.14 C 456.916 565.181 469.923 560.16 473.358 554.403 C 526.614 465.146 569.748 377.056 685.255 365.424 C 700.939 364.149 717.428 364.349 732.345 369.906 C 742.122 373.556 750.814 379.625 757.61 387.545 C 769.925 401.834 797.067 464.424 806.028 484.494 C 844.3 493.316 844.092 506.917 872.924 528.115 L 874.57 529.311 C 889.904 530.355 914.167 529.523 930.05 529.477 L 1032.86 529.361 L 1357.48 529.44 L 1547.16 529.3 C 1570.61 529.246 1598.84 530.709 1621.67 528.789 C 1634.04 527.748 1653.83 501.444 1667.66 494.347 C 1680.55 487.735 1679.46 488.146 1694.46 484.38 z M 1618.63 1611.85 C 1638.02 1611.92 1659.37 1611.54 1678.54 1613.63 C 1729.07 1619.02 1776.24 1641.53 1812.2 1677.44 C 1832.11 1697.63 1872.57 1754.77 1891.29 1779.78 L 2041.26 1979.56 C 2062.59 2007.75 2091.89 2050.38 2118.35 2072.07 C 2179.75 2122.43 2280.74 2079.96 2329.66 2030.86 C 2450.9 1909.19 2410.89 1701.43 2382.42 1550.13 C 2339.16 1320.27 2265.36 1091.63 2183.82 872.588 C 2171.41 839.186 2158.73 805.88 2145.8 772.675 C 2138.49 754.012 2129.34 729.172 2119.89 712.296 C 2112.24 698.693 2102.78 686.191 2091.77 675.131 C 1997.23 579.823 1775.02 543.885 1647.06 536.87 C 1607.6 534.707 1557.43 535.405 1516.89 535.404 L 1307.88 535.458 L 889.326 535.426 C 882.188 535.433 875.568 535.48 868.424 535.829 C 827.112 537.799 785.899 541.481 744.893 546.867 C 636.874 561.98 478.783 599.529 400.117 682.445 C 374.251 709.709 356.732 762.023 342.719 797.997 C 331.411 826.807 320.347 855.712 309.529 884.709 C 247.698 1047.54 194.101 1213.37 148.942 1381.59 C 124.016 1476.87 103.477 1570.92 89.2781 1668.51 C 70.5541 1797.2 61.2549 1941.42 167.819 2037.42 C 206.527 2072.29 261.493 2097.03 314.368 2094.64 C 347.205 2092.96 374.514 2076.26 395.129 2051.21 C 422.292 2018.21 448.855 1983.21 474.768 1949.03 L 595.373 1788.69 C 659.528 1702.89 705.012 1620.78 824.742 1612.95 C 857.391 1610.82 890.166 1611.79 922.838 1611.79 L 1090.53 1611.82 L 1618.63 1611.85 z M 1700.97 483.829 C 1778.58 483.335 1881.32 499.897 1954.79 524.782 C 1978.26 533.361 1996.22 540.033 2018.56 551.547 C 1989.59 500.137 1957.23 444.767 1910.56 407.444 C 1877.25 380.804 1826.59 366.453 1784.21 371.696 C 1766.27 375.689 1750.78 382.564 1741.44 399.355 C 1726.51 426.174 1715.07 456.376 1700.97 483.829 z M 768.388 490.376 C 735.189 492.107 702.1 495.547 669.254 500.682 C 606.849 510.807 492.355 537.526 446.163 584.616 C 429.66 601.439 424.351 632.374 420.618 654.977 C 439.195 640.719 458.974 628.101 479.733 617.264 C 591.563 562.243 741.518 532.929 865.84 530.193 C 824.889 497.361 830.891 486.893 768.388 490.376 z M 2043.88 630.712 C 2056.53 638.562 2068.73 647.133 2080.4 656.383 C 2073.3 618.176 2070.35 591.02 2035.15 567.782 C 1959.94 518.146 1782.32 484.398 1695.96 490.354 C 1663.82 496.196 1657.95 511.292 1634.37 530.16 C 1769.34 536.801 1925.1 563.266 2043.88 630.712 z M 680.291 371.594 C 587.547 384.63 545.734 444.663 500.772 519.977 C 494.876 529.853 488.645 541.503 482.334 550.96 C 515.262 535.652 536.738 526.972 571.593 516.721 C 638.21 497.727 730.547 481.98 800.169 483.864 L 799.267 482.335 C 763.22 420.442 770.934 363.804 680.291 371.594 z" />
+      <PathGeometry Figures="M 914.315 1127.77 C 1018.25 1119.47 1109.17 1197.13 1117.24 1301.07 C 1125.31 1405.02 1047.46 1495.78 943.496 1503.62 C 839.846 1511.45 749.426 1433.89 741.38 1330.26 C 733.334 1226.62 810.7 1136.04 914.315 1127.77 z M 944.746 1497.34 C 1045.46 1488.79 1120.01 1399.97 1110.97 1299.3 C 1101.94 1198.63 1012.75 1124.51 912.127 1134.04 C 812.192 1143.5 738.69 1231.94 747.666 1331.92 C 756.643 1431.9 844.724 1505.83 944.746 1497.34 z" />
+      <PathGeometry Figures="M 912.514 1150.37 C 914.969 1150.21 917.425 1150.07 919.883 1149.96 C 936.452 1149.22 972.107 1149.36 985.64 1161.12 C 994.667 1168.96 992.005 1192.41 991.847 1204.24 C 991.576 1220.72 991.578 1237.2 991.853 1253.68 C 1007.35 1254.07 1070.79 1249.92 1080.3 1256.79 C 1090.59 1264.22 1092.02 1289.09 1092.85 1300.71 C 1094.09 1318.11 1094.32 1359.44 1081.73 1372.77 C 1078.82 1375.85 1074.84 1376.8 1070.77 1377.35 C 1051.21 1380.03 1012.97 1377.54 991.847 1377.63 C 991.616 1393.6 994.991 1460.1 987.402 1469.55 C 980.887 1477.67 956.912 1478.79 946.905 1480.27 L 941.985 1480.56 C 924.281 1481.51 911.385 1480.17 893.954 1478.11 C 860.649 1474.16 866.865 1451.56 867.279 1425.03 C 867.431 1409.22 867.437 1393.41 867.295 1377.59 C 855.979 1377.41 782.202 1380.25 777.691 1373.71 C 761.042 1347.98 760.826 1283.63 776.664 1258.65 C 781.809 1250.54 854.382 1253.59 867.378 1253.28 C 867.687 1241.75 867.038 1229.53 867.384 1218 C 869.008 1163.85 854.536 1158.69 912.514 1150.37 z M 945.677 1474.33 C 951.556 1473.51 981.368 1470.38 983.287 1464.31 C 990.57 1441.28 981.292 1400.9 986.757 1378.58 C 991.234 1360.3 1073.84 1382.1 1079.87 1365.05 C 1090.13 1336.06 1089.62 1297.27 1081.18 1267.81 C 1080.3 1264.95 1077.08 1260.07 1073.72 1259.81 C 1047.91 1257.79 1018.37 1260.42 993.1 1258.61 C 976.315 1257.4 991.573 1177.13 983.579 1166.58 C 974.664 1154.81 923.717 1155.65 913.206 1156.48 C 901.603 1157.71 884.611 1158.26 875.86 1166.01 C 868.715 1180.02 876.767 1235.38 872.181 1253.59 C 871.792 1255.13 868.384 1257.53 867.104 1258.5 C 846.934 1262.39 800.632 1254.49 783.451 1261.39 C 765.053 1275.39 768.586 1357.64 783.041 1369.65 C 791.897 1377.02 869.756 1362.61 872.269 1378.65 C 883.13 1447.96 838.938 1480.34 945.677 1474.33 z" />
+      <PathGeometry Figures="M 604.027 758.126 C 699.008 748.8 783.538 818.3 792.75 913.291 C 801.961 1008.28 732.359 1092.73 637.356 1101.83 C 542.516 1110.91 458.245 1041.45 449.05 946.62 C 439.854 851.791 509.21 767.436 604.027 758.126 z M 637.364 1095.79 C 728.932 1086.68 795.774 1005.06 786.65 913.494 C 777.527 821.928 695.893 755.1 604.329 764.239 C 512.786 773.376 445.978 854.985 455.099 946.53 C 464.221 1038.07 545.818 1104.9 637.364 1095.79 z" />
+      <PathGeometry Figures="M 611.062 795.479 C 685.078 790.097 749.489 845.632 755.06 919.635 C 760.631 993.637 705.26 1058.19 631.272 1063.95 C 557.017 1069.73 492.181 1014.11 486.59 939.845 C 480.999 865.575 536.778 800.881 611.062 795.479 z M 630.055 1057.88 C 700.767 1052.81 754.01 991.424 749.037 920.705 C 744.064 849.986 682.754 796.657 612.028 801.53 C 541.161 806.412 487.702 867.871 492.685 938.732 C 497.668 1009.59 559.202 1062.96 630.055 1057.88 z" />
+      <PathGeometry Figures="M 1544.77 1130.35 C 1639.23 1124.23 1720.84 1195.69 1727.24 1290.14 C 1733.64 1384.58 1662.43 1466.41 1568 1473.09 C 1473.18 1479.81 1390.93 1408.22 1384.5 1313.38 C 1378.07 1218.53 1449.9 1136.5 1544.77 1130.35 z M 1563.15 1467.25 C 1654.34 1463.24 1725.1 1386.19 1721.35 1294.99 C 1717.6 1203.78 1640.76 1132.8 1549.55 1136.29 C 1457.96 1139.79 1386.63 1217.01 1390.39 1308.59 C 1394.16 1400.17 1471.58 1471.28 1563.15 1467.25 z" />
+      <PathGeometry Figures="M 1547.3 1168.54 C 1621.13 1163.45 1685.1 1219.19 1690.16 1293.03 C 1695.22 1366.86 1639.45 1430.81 1565.61 1435.83 C 1491.82 1440.85 1427.92 1385.12 1422.87 1311.33 C 1417.81 1237.55 1473.51 1173.62 1547.3 1168.54 z M 1566.82 1429.67 C 1637.04 1424.01 1689.44 1362.61 1684 1292.38 C 1678.57 1222.15 1617.35 1169.55 1547.1 1174.75 C 1476.52 1179.98 1423.63 1241.55 1429.09 1312.11 C 1434.55 1382.66 1496.28 1435.36 1566.82 1429.67 z" />
+      <PathGeometry Figures="M 1861.24 1013.79 C 1905.09 1009.97 1943.83 1042.19 1948.07 1086 C 1952.3 1129.81 1920.45 1168.86 1876.68 1173.51 C 1832.32 1178.22 1792.63 1145.84 1788.34 1101.44 C 1784.05 1057.04 1816.8 1017.66 1861.24 1013.79 z M 1876.65 1167.46 C 1917.05 1162.86 1946.21 1126.57 1942 1086.13 C 1937.8 1045.68 1901.8 1016.17 1861.32 1019.98 C 1820.27 1023.84 1790.25 1060.45 1794.51 1101.47 C 1798.78 1142.48 1835.69 1172.13 1876.65 1167.46 z" />
+      <PathGeometry Figures="M 2011 864.16 C 2054.58 858.411 2094.64 888.854 2100.77 932.372 C 2106.91 975.891 2076.82 1016.22 2033.36 1022.74 C 1989.35 1029.35 1948.4 998.796 1942.18 954.728 C 1935.97 910.66 1966.88 869.981 2011 864.16 z M 2033.41 1016.54 C 2073.84 1009.96 2101.23 971.783 2094.52 931.374 C 2087.81 890.964 2049.55 863.693 2009.16 870.531 C 1968.96 877.339 1941.84 915.389 1948.52 955.617 C 1955.2 995.844 1993.16 1023.09 2033.41 1016.54 z" />
+      <PathGeometry Figures="M 1705.13 864.447 C 1748.7 858.202 1789.11 888.354 1795.53 931.892 C 1801.95 975.43 1771.96 1015.96 1728.45 1022.56 C 1684.69 1029.19 1643.87 998.994 1637.42 955.208 C 1630.96 911.422 1661.32 870.728 1705.13 864.447 z M 1718.72 1017.26 C 1759.55 1015.99 1791.58 981.811 1790.21 940.99 C 1788.85 900.169 1754.6 868.211 1713.78 869.667 C 1673.09 871.118 1641.25 905.235 1642.62 945.93 C 1643.98 986.624 1678.03 1018.54 1718.72 1017.26 z" />
+      <PathGeometry Figures="M 1856.71 713.479 C 1900.17 707.19 1940.53 737.261 1946.93 780.709 C 1953.34 824.157 1923.38 864.595 1879.95 871.116 C 1836.35 877.662 1795.73 847.56 1789.3 803.948 C 1782.87 760.335 1813.08 719.792 1856.71 713.479 z M 1881.26 864.823 C 1921.1 857.607 1947.64 819.576 1940.67 779.688 C 1933.7 739.801 1895.83 713.026 1855.9 719.752 C 1815.63 726.537 1788.57 764.808 1795.6 805.043 C 1802.63 845.278 1841.07 872.102 1881.26 864.823 z" />
+      <PathGeometry Figures="M 1071.92 879.828 C 1102.25 877.252 1129.05 899.48 1132.13 929.77 C 1135.2 960.061 1113.41 987.22 1083.18 990.791 C 1063.17 993.154 1043.45 984.546 1031.58 968.271 C 1019.71 951.996 1017.53 930.585 1025.89 912.257 C 1034.25 893.929 1051.84 881.533 1071.92 879.828 z M 1083.17 984.678 C 1110.26 981.12 1129.41 956.373 1126.06 929.254 C 1122.7 902.135 1098.1 882.799 1070.96 885.951 C 1043.52 889.136 1023.94 914.058 1027.33 941.466 C 1030.72 968.874 1055.79 988.273 1083.17 984.678 z" />
+      <PathGeometry Figures="M 1413.49 879.992 C 1443.96 877.041 1471.09 899.254 1474.21 929.706 C 1477.32 960.157 1455.26 987.409 1424.83 990.696 C 1394.16 994.01 1366.64 971.736 1363.5 941.046 C 1360.36 910.355 1382.78 882.966 1413.49 879.992 z M 1419.93 984.836 C 1447.26 984.231 1468.91 961.573 1468.27 934.251 C 1467.63 906.928 1444.95 885.306 1417.62 885.979 C 1390.35 886.651 1368.78 909.287 1369.41 936.561 C 1370.05 963.835 1392.66 985.439 1419.93 984.836 z" />
+    </GeometryGroup>
+  </Path.Data>
+</Path>
+
+<!-- XBOX GUIDE BUTTON -->
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Guide" Classes.active="{Binding ButtonGuide}" Canvas.Left="0" Canvas.Top="0">
+    <Canvas Width="2508" Height="2508">
+        <Path Fill="#5E6982" IsHitTestVisible="False" Data="M 1241.62 596.651 C 1293.53 593.227 1338.42 632.443 1342 684.339 C 1345.59 736.236 1306.51 781.249 1254.62 784.99 C 1202.51 788.747 1157.26 749.462 1153.66 697.341 C 1150.07 645.22 1189.49 600.089 1241.62 596.651 z M 1251.67 778.929 C 1276.56 776.983 1293.03 769.794 1311.05 752.363 C 1303.22 735.251 1261.89 676.667 1246.28 674.356 C 1219.54 698.516 1199.13 718.592 1184.52 752.186 C 1205.36 771.446 1222.77 779.338 1251.67 778.929 z M 1193.5 620.068 L 1192.75 622.409 C 1206.58 634.411 1212.43 635.202 1228.21 651.577 C 1206.11 679.982 1181.37 710.864 1180.18 748.452 C 1197.35 714.541 1218.49 691.085 1247.58 666.637 C 1259.63 677.227 1272.4 688.857 1282.78 701.077 C 1296.42 717.424 1305.72 729.475 1315.24 749.086 C 1310.32 706.76 1292.51 684.325 1266.13 651.769 C 1276.01 641.404 1295.67 628.209 1300.09 622.466 L 1299.82 620.472 C 1285.81 615.265 1259.48 628.489 1247.61 635.994 C 1227.38 623.929 1217.36 619.652 1193.5 620.068 z M 1294.99 614.914 C 1277.37 607.362 1260.82 600.813 1241.19 602.861 C 1222.55 605.883 1217.8 607.863 1200.06 615.356 C 1217.82 617.128 1230.43 622.098 1246.81 628.995 C 1248.95 629.898 1251.56 628.371 1253.28 627.228 C 1269.21 619.497 1277.04 616.555 1294.99 614.914 z M 1186.72 626.284 C 1154.03 663.246 1150.03 699.095 1175.37 741.607 C 1176.61 735.259 1177.59 729.378 1179.58 723.209 C 1189.02 697.464 1203.94 671.824 1223.02 651.982 C 1212.77 642.747 1199.63 631.507 1186.72 626.284 z M 1317.09 731.691 L 1319.22 743.492 C 1334.43 718.228 1340.15 699.467 1333.6 669.151 C 1331.05 657.339 1318.19 632.92 1308.46 626.987 L 1305.97 626.774 C 1292.51 634.919 1284.16 641.173 1272.39 651.639 C 1292.21 676.947 1309.55 699.688 1317.09 731.691 z" />
+        <Ellipse Classes="btnPath" Width="196" Height="196" Canvas.Left="1151" Canvas.Top="594" />
+    </Canvas>
+</Button>
+
+<!-- TRIGGERS AND BUMPERS -->
+<Button Classes="pathRemapBtn ltBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LeftTrigger" Classes.active="{Binding ButtonLT}" Canvas.Left="0" Canvas.Top="0">
+    <Panel>
+        <Path Fill="Transparent" Data="M 680.291 371.594 C 587.547 384.63 545.734 444.663 500.772 519.977 C 494.876 529.853 488.645 541.503 482.334 550.96 C 515.262 535.652 536.738 526.972 571.593 516.721 C 638.21 497.727 730.547 481.98 800.169 483.864 L 799.267 482.335 C 763.22 420.442 770.934 363.804 680.291 371.594 z" />
+        <Path Classes="btnPath" Data="M 680.291 371.594 C 587.547 384.63 545.734 444.663 500.772 519.977 C 494.876 529.853 488.645 541.503 482.334 550.96 C 515.262 535.652 536.738 526.972 571.593 516.721 C 638.21 497.727 730.547 481.98 800.169 483.864 L 799.267 482.335 C 763.22 420.442 770.934 363.804 680.291 371.594 z" />
+        <Path Fill="{DynamicResource AccentColor}" Opacity="{Binding LeftTriggerFill}" IsHitTestVisible="False" Data="M 680.291 371.594 C 587.547 384.63 545.734 444.663 500.772 519.977 C 494.876 529.853 488.645 541.503 482.334 550.96 C 515.262 535.652 536.738 526.972 571.593 516.721 C 638.21 497.727 730.547 481.98 800.169 483.864 L 799.267 482.335 C 763.22 420.442 770.934 363.804 680.291 371.594 z" />
+    </Panel>
+</Button>
+<Button Classes="pathRemapBtn rtBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RightTrigger" Classes.active="{Binding ButtonRT}" Canvas.Left="0" Canvas.Top="0">
+    <Panel>
+        <Path Fill="Transparent" Data="M 1700.97 483.829 C 1778.58 483.335 1881.32 499.897 1954.79 524.782 C 1978.26 533.361 1996.22 540.033 2018.56 551.547 C 1989.59 500.137 1957.23 444.767 1910.56 407.444 C 1877.25 380.804 1826.59 366.453 1784.21 371.696 C 1766.27 375.689 1750.78 382.564 1741.44 399.355 C 1726.51 426.174 1715.07 456.376 1700.97 483.829 z " />
+        <Path Classes="btnPath" Data="M 1700.97 483.829 C 1778.58 483.335 1881.32 499.897 1954.79 524.782 C 1978.26 533.361 1996.22 540.033 2018.56 551.547 C 1989.59 500.137 1957.23 444.767 1910.56 407.444 C 1877.25 380.804 1826.59 366.453 1784.21 371.696 C 1766.27 375.689 1750.78 382.564 1741.44 399.355 C 1726.51 426.174 1715.07 456.376 1700.97 483.829 z " />
+        <Path Fill="{DynamicResource AccentColor}" Opacity="{Binding RightTriggerFill}" IsHitTestVisible="False" Data="M 1700.97 483.829 C 1778.58 483.335 1881.32 499.897 1954.79 524.782 C 1978.26 533.361 1996.22 540.033 2018.56 551.547 C 1989.59 500.137 1957.23 444.767 1910.56 407.444 C 1877.25 380.804 1826.59 366.453 1784.21 371.696 C 1766.27 375.689 1750.78 382.564 1741.44 399.355 C 1726.51 426.174 1715.07 456.376 1700.97 483.829 z " />
+    </Panel>
+</Button>
+<Button Classes="pathRemapBtn lbBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LeftShoulder" Classes.active="{Binding ButtonLB}" Canvas.Left="0" Canvas.Top="0">
+    <Panel>
+        <Path Fill="Transparent" Data="M 768.388 490.376 C 735.189 492.107 702.1 495.547 669.254 500.682 C 606.849 510.807 492.355 537.526 446.163 584.616 C 429.66 601.439 424.351 632.374 420.618 654.977 C 439.195 640.719 458.974 628.101 479.733 617.264 C 591.563 562.243 741.518 532.929 865.84 530.193 C 824.889 497.361 830.891 486.893 768.388 490.376 z " />
+        <Path Classes="btnPath" Data="M 768.388 490.376 C 735.189 492.107 702.1 495.547 669.254 500.682 C 606.849 510.807 492.355 537.526 446.163 584.616 C 429.66 601.439 424.351 632.374 420.618 654.977 C 439.195 640.719 458.974 628.101 479.733 617.264 C 591.563 562.243 741.518 532.929 865.84 530.193 C 824.889 497.361 830.891 486.893 768.388 490.376 z " />
+    </Panel>
+</Button>
+<Button Classes="pathRemapBtn rbBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RightShoulder" Classes.active="{Binding ButtonRB}" Canvas.Left="0" Canvas.Top="0">
+    <Panel>
+        <Path Fill="Transparent" Data="M 2043.88 630.712 C 2056.53 638.562 2068.73 647.133 2080.4 656.383 C 2073.3 618.176 2070.35 591.02 2035.15 567.782 C 1959.94 518.146 1782.32 484.398 1695.96 490.354 C 1663.82 496.196 1657.95 511.292 1634.37 530.16 C 1769.34 536.801 1925.1 563.266 2043.88 630.712 z " />
+        <Path Classes="btnPath" Data="M 2043.88 630.712 C 2056.53 638.562 2068.73 647.133 2080.4 656.383 C 2073.3 618.176 2070.35 591.02 2035.15 567.782 C 1959.94 518.146 1782.32 484.398 1695.96 490.354 C 1663.82 496.196 1657.95 511.292 1634.37 530.16 C 1769.34 536.801 1925.1 563.266 2043.88 630.712 z " />
+    </Panel>
+</Button>
+
+<!-- MENU BUTTONS -->
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Back" Classes.active="{Binding ButtonBack}" Canvas.Left="1017.53" Canvas.Top="876.252">
+    <Grid Width="118" Height="118">
+        <Ellipse Classes="btnPath" Width="118" Height="118" Stroke="{DynamicResource BorderHighlightColor}" StrokeThickness="8" />
+        <TextBlock Classes="systemButtonLabel" Text="Back" />
+    </Grid>
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Start" Classes.active="{Binding ButtonStart}" Canvas.Left="1360.36" Canvas.Top="877.041">
+    <Grid Width="117" Height="117">
+        <Ellipse Classes="btnPath" Width="117" Height="117" Stroke="{DynamicResource BorderHighlightColor}" StrokeThickness="8" />
+        <TextBlock Classes="systemButtonLabel" Text="Start" />
+    </Grid>
+</Button>
+
+<!-- FACE BUTTONS -->
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="A" Classes.active="{Binding ButtonA}" Canvas.Left="1784.05" Canvas.Top="1009.97">
+    <Panel Width="168" Height="168">
+        <Image Source="avares://ZeroCue.DataProbe/Assets/gamepad-icons/XGamepad/Default/T_X_A_Color.png" Stretch="Uniform" Margin="5" />
+        <Ellipse Classes="btnPath" Width="168" Height="168" />
+    </Panel>
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="B" Classes.active="{Binding ButtonB}" Canvas.Left="1935.97" Canvas.Top="858.411">
+    <Panel Width="171" Height="171">
+        <Image Source="avares://ZeroCue.DataProbe/Assets/gamepad-icons/XGamepad/Default/T_X_B_Color.png" Stretch="Uniform" Margin="5" />
+        <Ellipse Classes="btnPath" Width="171" Height="171" />
+    </Panel>
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="X" Classes.active="{Binding ButtonX}" Canvas.Left="1630.96" Canvas.Top="858.202">
+    <Panel Width="171" Height="171">
+        <Image Source="avares://ZeroCue.DataProbe/Assets/gamepad-icons/XGamepad/Default/T_X_X_Color.png" Stretch="Uniform" Margin="5" />
+        <Ellipse Classes="btnPath" Width="171" Height="171" />
+    </Panel>
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Y" Classes.active="{Binding ButtonY}" Canvas.Left="1782.87" Canvas.Top="707.19">
+    <Panel Width="170" Height="170">
+        <Image Source="avares://ZeroCue.DataProbe/Assets/gamepad-icons/XGamepad/Default/T_X_Y_Color.png" Stretch="Uniform" Margin="5" />
+        <Ellipse Classes="btnPath" Width="170" Height="170" />
+    </Panel>
+</Button>
+
+<!-- JOYSTICK DOTS -->
+<Ellipse Width="100" Height="100" Fill="{DynamicResource AccentColor}" Opacity="{Binding LeftStickOpacity}" IsHitTestVisible="False" Canvas.Left="{Binding LeftStickKnobX}" Canvas.Top="{Binding LeftStickKnobY}">
+    <Ellipse.RenderTransform><TranslateTransform X="-234" Y="-337" /></Ellipse.RenderTransform>
+    <Ellipse.Transitions><Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="LinearEasing" /></Transitions></Ellipse.Transitions>
+</Ellipse>
+<Ellipse Width="100" Height="100" Fill="{DynamicResource AccentColor}" Opacity="{Binding RightStickOpacity}" IsHitTestVisible="False" Canvas.Left="{Binding RightStickKnobX}" Canvas.Top="{Binding RightStickKnobY}">
+    <Ellipse.RenderTransform><TranslateTransform X="-78" Y="35" /></Ellipse.RenderTransform>
+    <Ellipse.Transitions><Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="LinearEasing" /></Transitions></Ellipse.Transitions>
+</Ellipse>
+
+<!-- LS_ 4 Zones -->
+<Canvas Canvas.Left="439.854" Canvas.Top="748.8" Width="362.107" Height="362.11">
+    <Canvas.Clip>
+        <EllipseGeometry Rect="0,0,362.107,362.11" />
+    </Canvas.Clip>
+    <Button Classes="pathRemapBtn dpadUp" Command="{Binding BeginRemapCommand}" CommandParameter="LS_Up" Classes.active="{Binding LS_Up}" Canvas.Left="0" Canvas.Top="0">
+        <Polygon Classes="btnPath" Points="0,0 362.107,0 181.0535,181.055" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadRight" Command="{Binding BeginRemapCommand}" CommandParameter="LS_Right" Classes.active="{Binding LS_Right}" Canvas.Left="181.0535" Canvas.Top="0">
+        <Polygon Classes="btnPath" Points="181.0535,0 181.0535,362.11 0,181.055" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadDown" Command="{Binding BeginRemapCommand}" CommandParameter="LS_Down" Classes.active="{Binding LS_Down}" Canvas.Left="0" Canvas.Top="181.055">
+        <Polygon Classes="btnPath" Points="362.107,181.055 0,181.055 181.0535,0" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadLeft" Command="{Binding BeginRemapCommand}" CommandParameter="LS_Left" Classes.active="{Binding LS_Left}" Canvas.Left="0" Canvas.Top="0">
+        <Polygon Classes="btnPath" Points="0,362.11 0,0 181.0535,181.055" />
+    </Button>
+</Canvas>
+
+<!-- DPad 4 Zones -->
+<Canvas Canvas.Left="733.334" Canvas.Top="1119.47" Width="391.976" Height="391.98">
+    <Canvas.Clip>
+        <EllipseGeometry Rect="0,0,391.976,391.98" />
+    </Canvas.Clip>
+    <Button Classes="pathRemapBtn dpadUp" Command="{Binding BeginRemapCommand}" CommandParameter="Up" Classes.active="{Binding DPadUp}" Canvas.Left="0" Canvas.Top="0">
+        <Polygon Classes="btnPath" Points="0,0 391.976,0 195.988,195.99" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadRight" Command="{Binding BeginRemapCommand}" CommandParameter="Right" Classes.active="{Binding DPadRight}" Canvas.Left="195.988" Canvas.Top="0">
+        <Polygon Classes="btnPath" Points="195.988,0 195.988,391.98 0,195.99" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadDown" Command="{Binding BeginRemapCommand}" CommandParameter="Down" Classes.active="{Binding DPadDown}" Canvas.Left="0" Canvas.Top="195.99">
+        <Polygon Classes="btnPath" Points="391.976,195.99 0,195.99 195.988,0" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadLeft" Command="{Binding BeginRemapCommand}" CommandParameter="Left" Classes.active="{Binding DPadLeft}" Canvas.Left="0" Canvas.Top="0">
+        <Polygon Classes="btnPath" Points="0,391.98 0,0 195.988,195.99" />
+    </Button>
+</Canvas>
+
+<!-- RS_ 4 Zones -->
+<Canvas Canvas.Left="1378.07" Canvas.Top="1124.23" Width="355.57" Height="355.58">
+    <Canvas.Clip>
+        <EllipseGeometry Rect="0,0,355.57,355.58" />
+    </Canvas.Clip>
+    <Button Classes="pathRemapBtn dpadUp" Command="{Binding BeginRemapCommand}" CommandParameter="RS_Up" Classes.active="{Binding RS_Up}" Canvas.Left="0" Canvas.Top="0">
+        <Polygon Classes="btnPath" Points="0,0 355.57,0 177.785,177.79" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadRight" Command="{Binding BeginRemapCommand}" CommandParameter="RS_Right" Classes.active="{Binding RS_Right}" Canvas.Left="177.785" Canvas.Top="0">
+        <Polygon Classes="btnPath" Points="177.785,0 177.785,355.58 0,177.79" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadDown" Command="{Binding BeginRemapCommand}" CommandParameter="RS_Down" Classes.active="{Binding RS_Down}" Canvas.Left="0" Canvas.Top="177.79">
+        <Polygon Classes="btnPath" Points="355.57,177.79 0,177.79 177.785,0" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadLeft" Command="{Binding BeginRemapCommand}" CommandParameter="RS_Left" Classes.active="{Binding RS_Left}" Canvas.Left="0" Canvas.Top="0">
+        <Polygon Classes="btnPath" Points="0,355.58 0,0 177.785,177.79" />
+    </Button>
+</Canvas>
+
+<!-- THUMBSTICK CLICKS (L3 / R3) -->
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LeftThumb" Classes.active="{Binding ButtonL3}" Canvas.Left="540.9075" Canvas.Top="849.855">
+    <Rectangle Classes="btnPath" Width="160" Height="160" RadiusX="80" RadiusY="80" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RightThumb" Classes.active="{Binding ButtonR3}" Canvas.Left="1475.855" Canvas.Top="1222.02">
+    <Rectangle Classes="btnPath" Width="160" Height="160" RadiusX="80" RadiusY="80" />
+</Button>
+
+            </Canvas>
+        </Panel>
+    </Viewbox>
+</Grid>
+
+</UserControl>

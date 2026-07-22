@@ -1,0 +1,439 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ZeroCue.DataProbe.ViewModels"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="700"
+             x:DataType="vm:MainViewModel"
+             x:Class="ZeroCue.DataProbe.Views.ProfilesView">
+
+    <UserControl.Styles>
+        <Style Selector="Button.profileIconButton">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Button.profileSecondaryButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryColor}"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="MinHeight" Value="38"/>
+        </Style>
+
+        <Style Selector="Button.profilePrimaryButton">
+            <Setter Property="Background" Value="{DynamicResource AccentColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppBackgroundColor}"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Button.profileActivateButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryColor}"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="MinHeight" Value="38"/>
+            <Setter Property="Width" Value="110"/>
+        </Style>
+
+        <Style Selector="Border.profileCard:pointerover Button.profileActivateButton">
+            <Setter Property="Background" Value="{DynamicResource AltPanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+        </Style>
+
+        <Style Selector="Button.profileDangerIconButton">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Button.profileLinkedAppsButton">
+            <Setter Property="Width" Value="128"/>
+            <Setter Property="MinHeight" Value="38"/>
+            <Setter Property="Padding" Value="10,9"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryColor}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Border.linkedAppRow">
+            <Setter Property="Background" Value="{DynamicResource AltPanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="10"/>
+        </Style>
+
+        <Style Selector="Border.profileStatusPill">
+            <Setter Property="Background" Value="{DynamicResource AccentSemiTransparentColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="MinHeight" Value="38"/>
+            <Setter Property="Width" Value="110"/>
+        </Style>
+
+        <Style Selector="Border.profileLinkedIndicator">
+            <Setter Property="Background" Value="{DynamicResource AltPanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+
+        <Style Selector="Border.profileDefaultIndicator">
+            <Setter Property="Background" Value="{DynamicResource AccentSemiTransparentColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+
+        <Style Selector="Border.profileCard">
+            <Setter Property="Background" Value="{DynamicResource PanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Width" Value="400"/>
+            <Setter Property="MinHeight" Value="184"/>
+            <Setter Property="Margin" Value="0,0,22,22"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+        <Style Selector="Border.profileCard:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+            <Setter Property="Background" Value="{DynamicResource PanelBackgroundColor}"/>
+        </Style>
+
+        <Style Selector="Border.profileCard.active">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+        <Style Selector="Border.profileCard:pointerover Border.profileAccentStrip">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+
+        <Style Selector="Border.profileCard.active Border.profileAccentStrip">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <Border Grid.Row="0" Background="{DynamicResource PanelBackgroundColor}" Padding="30,20" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" ZIndex="10">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel VerticalAlignment="Center" Spacing="5">
+                    <TextBlock Text="{DynamicResource ProfilesDashboard}" Foreground="{DynamicResource TextHeaderColor}" FontSize="28" FontWeight="Bold"/>
+                    <TextBlock Text="{DynamicResource ProfilesSubtitle}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="14"/>
+                </StackPanel>
+
+                <Button Grid.Column="1" Classes="profilePrimaryButton" Command="{Binding CreateProfileCommand}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <materialIcons:MaterialIcon Kind="Plus" Width="18" Height="18"/>
+                        <TextBlock Text="{DynamicResource CreateNewProfile}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <ScrollViewer Padding="30">
+                <ItemsControl ItemsSource="{Binding ProfileCards}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:ProfileItemViewModel">
+                            <Border Classes="profileCard" Classes.active="{Binding IsSelected}" ClipToBounds="True">
+                                <Grid RowDefinitions="Auto,*">
+                                    <Border Grid.Row="0" Classes="profileAccentStrip" Height="4" Background="{DynamicResource AccentColor}" Opacity="0.35"/>
+
+                                    <Border Grid.Row="1" Padding="18,22,18,14">
+                                        <Grid RowDefinitions="Auto,*,Auto">
+                                        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+                                            <Border Background="{DynamicResource AccentSemiTransparentColor}" Width="48" Height="48" CornerRadius="8" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="GamepadVariant" Width="27" Height="27" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+
+                                            <StackPanel Grid.Column="1" Spacing="7" Margin="13,0,12,0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}"
+                                                           Foreground="{DynamicResource TextPrimaryColor}"
+                                                           FontSize="22"
+                                                           FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                <Border Classes="profileDefaultIndicator" IsVisible="{Binding IsDefault}" ToolTip.Tip="{DynamicResource DefaultProfile}" VerticalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="Star" Width="17" Height="17" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <Border Classes="profileLinkedIndicator" IsVisible="{Binding HasLinkedApp}" ToolTip.Tip="{DynamicResource ProfileLinkedApp}" VerticalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="LinkVariant" Width="17" Height="17" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <Button Classes="profileIconButton" ToolTip.Tip="{DynamicResource ProfileOptions}" VerticalAlignment="Center">
+                                                    <Button.Flyout>
+                                                        <MenuFlyout>
+                                                            <MenuItem Header="{DynamicResource RenameProfileTitle}" Command="{Binding RenameProfileCommand}">
+                                                                <MenuItem.Icon>
+                                                                    <materialIcons:MaterialIcon Kind="PencilOutline" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{DynamicResource DuplicateProfile}" Command="{Binding DuplicateProfileCommand}">
+                                                                <MenuItem.Icon>
+                                                                    <materialIcons:MaterialIcon Kind="ContentCopy" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{DynamicResource DeleteProfile}" Command="{Binding DeleteProfileCommand}" IsEnabled="{Binding CanDelete}">
+                                                                <MenuItem.Icon>
+                                                                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{DynamicResource SetAsDefaultProfile}" Command="{Binding SetDefaultProfileCommand}" IsEnabled="{Binding IsNotDefault}">
+                                                                <MenuItem.Icon>
+                                                                    <materialIcons:MaterialIcon Kind="StarOutline" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                    <materialIcons:MaterialIcon Kind="DotsVertical" Width="18" Height="18" Foreground="{DynamicResource TextSecondaryColor}"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,0,0,0">
+                                            <Button Grid.Column="0" Classes="profileSecondaryButton" Command="{Binding SelectProfileCommand}" Margin="0,0,8,0">
+                                                <TextBlock Text="{DynamicResource EditMapping}" TextTrimming="CharacterEllipsis"/>
+                                            </Button>
+
+                                            <Button Grid.Column="1" Classes="profileLinkedAppsButton" Command="{Binding ManageLinkedAppsCommand}" ToolTip.Tip="{DynamicResource ManageLinkedApps}" Margin="0,0,8,0">
+                                                <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="LinkVariant" Width="16" Height="16" Foreground="{DynamicResource TextSecondaryColor}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{DynamicResource ManageLinkedApps}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <Button Grid.Column="3" Classes="profileActivateButton" Command="{Binding ActivateProfileCommand}" IsVisible="{Binding IsNotSelected}">
+                                                <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="CheckCircleOutline" Width="16" Height="16" Foreground="{DynamicResource TextSecondaryColor}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{DynamicResource ActivateProfile}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+
+                                            <Border Grid.Column="3" Classes="profileStatusPill" IsVisible="{Binding IsSelected}" HorizontalAlignment="Right">
+                                                <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                                                    <materialIcons:MaterialIcon Kind="CheckCircle" Width="16" Height="16" Foreground="{DynamicResource AccentColor}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{DynamicResource ActiveProfileBadge}" Foreground="{DynamicResource AccentColor}" FontSize="13" FontWeight="Bold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <Grid Background="{DynamicResource OverlayBackgroundColor}" IsVisible="{Binding IsLinkedAppsManagerOpen}" ZIndex="40">
+                <Button Command="{Binding CloseLinkedAppsManagerCommand}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="0" BorderThickness="0" Padding="0">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Border Background="Transparent"/>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Border Background="{DynamicResource PanelBackgroundColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" CornerRadius="8" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="30" Width="700" MaxHeight="580">
+                    <Grid RowDefinitions="Auto,*,Auto">
+                        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,18">
+                            <Border Background="{DynamicResource AccentSemiTransparentColor}" Width="42" Height="42" CornerRadius="8">
+                                <materialIcons:MaterialIcon Kind="LinkVariant" Width="24" Height="24" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="5" Margin="14,0,0,0">
+                                <TextBlock Text="{Binding LinkedAppsManagerTitle}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextHeaderColor}" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding LinkedAppsManagerDescription}" FontSize="14" Foreground="{DynamicResource TextSecondaryColor}"/>
+                            </StackPanel>
+                            <Button Grid.Column="2" Classes="profileIconButton" Command="{Binding CloseLinkedAppsManagerCommand}" ToolTip.Tip="{DynamicResource Close}">
+                                <materialIcons:MaterialIcon Kind="Close" Width="17" Height="17" Foreground="{DynamicResource TextSecondaryColor}"/>
+                            </Button>
+                        </Grid>
+
+                        <Grid Grid.Row="1">
+                            <Border Classes="linkedAppRow" IsVisible="{Binding !HasManagedLinkedApps}" VerticalAlignment="Top">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <materialIcons:MaterialIcon Kind="LinkOff" Width="20" Height="20" Foreground="{DynamicResource TextSecondaryColor}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <TextBlock Grid.Column="1" Text="{DynamicResource ProfileNoLinkedAppHint}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="14" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <ScrollViewer IsVisible="{Binding HasManagedLinkedApps}" MaxHeight="380">
+                                <ItemsControl ItemsSource="{Binding ManagedLinkedAppItems}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate DataType="vm:LinkedAppItemViewModel">
+                                            <Border Classes="linkedAppRow" Margin="0,0,0,10">
+                                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                                    <Border Background="{DynamicResource AccentSemiTransparentColor}" Width="36" Height="36" CornerRadius="7">
+                                                        <materialIcons:MaterialIcon Kind="ApplicationOutline" Width="20" Height="20" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Spacing="3" Margin="12,0,12,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Name}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding DirectoryPath}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2"
+                                                            Classes="profileDangerIconButton"
+                                                            Command="{Binding $parent[UserControl].DataContext.RemoveLinkedAppCommand}"
+                                                            CommandParameter="{Binding}"
+                                                            ToolTip.Tip="{DynamicResource RemoveThisLinkedExe}">
+                                                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="17" Height="17" Foreground="{DynamicResource TextSecondaryColor}"/>
+                                                    </Button>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+
+                        <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,20,0,0">
+                            <Button Grid.Column="0" Classes="profilePrimaryButton" Click="LinkAppButton_Click" Tag="{Binding ManagedLinkedAppsProfile}">
+                                <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                                    <materialIcons:MaterialIcon Kind="Plus" Width="16" Height="16"/>
+                                    <TextBlock Text="{DynamicResource AddLinkedExe}"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Button Grid.Column="2" Classes="profileSecondaryButton" Command="{Binding ClearManagedLinkedAppsCommand}" IsVisible="{Binding HasManagedLinkedApps}" Margin="0,0,12,0">
+                                <TextBlock Text="{DynamicResource RemoveAllLinkedExe}" TextTrimming="CharacterEllipsis"/>
+                            </Button>
+                            <Button Grid.Column="3" Content="{DynamicResource Close}" Command="{Binding CloseLinkedAppsManagerCommand}" Classes="profileSecondaryButton"/>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <Grid Background="{DynamicResource OverlayBackgroundColor}" IsVisible="{Binding IsProfileDeleteDialogOpen}" ZIndex="42">
+                <Button Command="{Binding CancelProfileDeleteCommand}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="0" BorderThickness="0" Padding="0">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Border Background="Transparent"/>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Border Background="{DynamicResource PanelBackgroundColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" CornerRadius="8" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="34" Width="520">
+                    <StackPanel Spacing="18">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <materialIcons:MaterialIcon Kind="AlertCircleOutline" Width="30" Height="30" Foreground="{DynamicResource AccentColor}" VerticalAlignment="Top"/>
+                            <StackPanel Spacing="7">
+                                <TextBlock Text="{Binding ProfileDeleteTitle}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextHeaderColor}"/>
+                                <TextBlock Text="{Binding ProfileDeleteDescription}" FontSize="15" Foreground="{DynamicResource TextSecondaryColor}" TextWrapping="Wrap" MaxWidth="410"/>
+                                <TextBlock Text="{Binding ProfileActionError}" IsVisible="{Binding HasProfileActionError}" Foreground="{DynamicResource ErrorColor}" FontSize="12" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                            <Button Content="{DynamicResource Cancel}" Command="{Binding CancelProfileDeleteCommand}" Classes="profileSecondaryButton"/>
+                            <Button Content="{DynamicResource DeleteProfile}" Command="{Binding ConfirmProfileDeleteCommand}" Classes="profilePrimaryButton"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid Background="{DynamicResource OverlayBackgroundColor}" IsVisible="{Binding IsProfileLinkDialogOpen}" ZIndex="43">
+                <Button Command="{Binding CancelProfileLinkCommand}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="0" BorderThickness="0" Padding="0">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Border Background="Transparent"/>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Border Background="{DynamicResource PanelBackgroundColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" CornerRadius="8" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="34" Width="540">
+                    <StackPanel Spacing="18">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <materialIcons:MaterialIcon Kind="LinkVariant" Width="30" Height="30" Foreground="{DynamicResource AccentColor}" VerticalAlignment="Top"/>
+                            <StackPanel Spacing="7">
+                                <TextBlock Text="{Binding ProfileLinkTitle}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextHeaderColor}"/>
+                                <TextBlock Text="{Binding ProfileLinkDescription}" FontSize="15" Foreground="{DynamicResource TextSecondaryColor}" TextWrapping="Wrap" MaxWidth="420"/>
+                                <TextBlock Text="{Binding PendingLinkedAppPath}" Foreground="{DynamicResource TextMutedColor}" FontSize="12" TextWrapping="Wrap" MaxWidth="420"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                            <Button Content="{DynamicResource Cancel}" Command="{Binding CancelProfileLinkCommand}" Classes="profileSecondaryButton"/>
+                            <Button Content="{DynamicResource Accept}" Command="{Binding ConfirmProfileLinkCommand}" Classes="profilePrimaryButton"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Grid Background="{DynamicResource OverlayBackgroundColor}" IsVisible="{Binding IsProfileUnlinkDialogOpen}" ZIndex="44">
+                <Button Command="{Binding CancelProfileUnlinkCommand}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="0" BorderThickness="0" Padding="0">
+                    <Button.Template>
+                        <ControlTemplate>
+                            <Border Background="Transparent"/>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Border Background="{DynamicResource PanelBackgroundColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" CornerRadius="8" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="34" Width="520">
+                    <StackPanel Spacing="18">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <materialIcons:MaterialIcon Kind="AlertCircleOutline" Width="30" Height="30" Foreground="{DynamicResource AccentColor}" VerticalAlignment="Top"/>
+                            <StackPanel Spacing="7">
+                                <TextBlock Text="{Binding ProfileUnlinkTitle}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextHeaderColor}"/>
+                                <TextBlock Text="{Binding ProfileUnlinkDescription}" FontSize="15" Foreground="{DynamicResource TextSecondaryColor}" TextWrapping="Wrap" MaxWidth="410"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+                            <Button Content="{DynamicResource Cancel}" Command="{Binding CancelProfileUnlinkCommand}" Classes="profileSecondaryButton"/>
+                            <Button Content="{DynamicResource RemoveLinkedExe}" Command="{Binding ConfirmProfileUnlinkCommand}" Classes="profilePrimaryButton"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

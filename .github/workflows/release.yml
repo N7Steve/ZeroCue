@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: ZeroCue.DataProbe/packages.lock.json
+
+      - name: Read version from tag
+        id: version
+        shell: pwsh
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if ($env:TAG_NAME -notmatch '^v(?<version>[0-9]+\.[0-9]+\.[0-9]+(?:[-.][0-9A-Za-z.-]+)?)$') {
+            throw "Release tag must use the form v1.2.3 or v1.2.3-prerelease."
+          }
+          "value=$($Matches.version)" >> $env:GITHUB_OUTPUT
+
+      - name: Restore locked dependencies
+        run: dotnet restore ZeroCue.DataProbe/ZeroCue.DataProbe.csproj --locked-mode
+
+      - name: Verify bundled runtime assets
+        shell: pwsh
+        run: ./scripts/verify-runtime-assets.ps1
+
+      - name: Verify driver restoration boundaries
+        shell: pwsh
+        run: ./scripts/verify-driver-safety.ps1
+
+      - name: Audit dependency and runtime licenses
+        shell: pwsh
+        run: ./scripts/collect-third-party-notices.ps1 -DestinationRoot "$env:RUNNER_TEMP\zerocue-license-audit"
+
+      - name: Build
+        run: dotnet build ZeroCue.DataProbe/ZeroCue.DataProbe.csproj --configuration Release --no-restore
+
+      - name: Audit NuGet packages
+        run: dotnet list ZeroCue.DataProbe/ZeroCue.DataProbe.csproj package --vulnerable --include-transitive
+
+      - name: Create portable package
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: ./scripts/publish-portable.ps1 -Version $env:RELEASE_VERSION
+
+      - name: Publish GitHub prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          $zip = Get-Item "artifacts\ZeroCue-v$env:RELEASE_VERSION-win-x64-portable.zip"
+          $sha256 = (Get-FileHash -LiteralPath $zip.FullName -Algorithm SHA256).Hash
+          $checksum = "$($zip.FullName).sha256"
+          "$sha256  $($zip.Name)" | Set-Content -LiteralPath $checksum -Encoding ascii
+
+          $notes = Join-Path $env:RUNNER_TEMP "release-notes.md"
+          @"
+          ZeroCue's first public alpha for Windows x64.
+
+          Driver installation is required for the connection mode you use. Install
+          the controller driver for wired USB, the receiver driver for wireless, or
+          both. While a ZeroCue driver is installed, iCUE cannot detect the controller
+          through that connection mode. You can restore the original driver with
+          ZeroCue or independently through Windows Device Manager.
+
+          The executables are not Authenticode-signed and may trigger Windows
+          SmartScreen. Download only from this repository and verify the checksum.
+
+          SHA-256: $sha256
+          "@ | Set-Content -LiteralPath $notes -Encoding utf8
+
+          $asset = "$($zip.FullName)#Windows x64 portable"
+          $checksumAsset = "$checksum#SHA-256 checksum"
+
+          gh release view $env:TAG_NAME *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG_NAME $asset $checksumAsset --clobber
+            gh release edit $env:TAG_NAME `
+              --verify-tag `
+              --title "ZeroCue $env:TAG_NAME" `
+              --notes-file $notes `
+              --prerelease
+          }
+          else {
+            gh release create $env:TAG_NAME $asset $checksumAsset `
+              --verify-tag `
+              --title "ZeroCue $env:TAG_NAME" `
+              --notes-file $notes `
+              --prerelease
+          }

@@ -1,0 +1,298 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ZeroCue.DataProbe.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="560"
+             x:Class="ZeroCue.DataProbe.Views.SticksView"
+             x:DataType="vm:MainViewModel">
+    <UserControl.Styles>
+        <Style Selector="RadioButton.stickCurveBtn">
+            <Setter Property="Background" Value="{DynamicResource ToggleContainerColor}" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryColor}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="RadioButton.stickCurveBtn:pointerover">
+            <Setter Property="Foreground" Value="#EAF2FF" />
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}" />
+        </Style>
+        <Style Selector="RadioButton.stickCurveBtn:checked">
+            <Setter Property="Background" Value="{DynamicResource AccentSemiTransparentColor}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentColor}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}" />
+        </Style>
+        <Style Selector="Thumb.curveDot">
+            <Setter Property="Opacity" Value="0.88" />
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Ellipse Width="12" Height="12" Fill="{DynamicResource AccentColor}" Stroke="#0F111A" StrokeThickness="1" />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="TextBlock.metricLabel">
+            <Setter Property="Foreground" Value="{DynamicResource TextMutedColor}" />
+            <Setter Property="FontSize" Value="8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style Selector="TextBlock.metricValue">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid MaxWidth="1000" RowDefinitions="Auto,*" Background="{DynamicResource AppBackgroundColor}" Margin="28">
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,18">
+            <StackPanel Spacing="5">
+                <TextBlock Text="{DynamicResource SticksTitle}" Foreground="White" FontSize="25" FontWeight="SemiBold" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <RadioButton Classes="stickCurveBtn"
+                             GroupName="StickCurve"
+                             Content="{DynamicResource LinearCurve}"
+                             Command="{Binding SetStickCurveCommand}"
+                             CommandParameter="Lineal"
+                             IsChecked="{Binding IsStickCurveLineal, Mode=OneWay}" />
+                <RadioButton Classes="stickCurveBtn"
+                             GroupName="StickCurve"
+                             Content="{DynamicResource PreciseCurve}"
+                             Command="{Binding SetStickCurveCommand}"
+                             CommandParameter="Precisa"
+                             IsChecked="{Binding IsStickCurvePrecisa, Mode=OneWay}" />
+                <RadioButton Classes="stickCurveBtn"
+                             GroupName="StickCurve"
+                             Content="{DynamicResource DynamicCurve}"
+                             Command="{Binding SetStickCurveCommand}"
+                             CommandParameter="Dinamica"
+                             IsChecked="{Binding IsStickCurveDinamica, Mode=OneWay}" />
+                <RadioButton Classes="stickCurveBtn"
+                             GroupName="StickCurve"
+                             Content="{DynamicResource AggressiveCurve}"
+                             Command="{Binding SetStickCurveCommand}"
+                             CommandParameter="Agresiva"
+                             IsChecked="{Binding IsStickCurveAgresiva, Mode=OneWay}" />
+                <RadioButton Classes="stickCurveBtn"
+                             GroupName="StickCurve"
+                             Content="{DynamicResource CustomCurve}"
+                             Command="{Binding SetStickCurveCommand}"
+                             CommandParameter="Custom"
+                             IsChecked="{Binding IsStickCurveCustom, Mode=OneWay}" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,*,1.15*">
+            <Border Grid.Column="0"
+                    Background="{DynamicResource PanelBackgroundColor}"
+                    BorderBrush="{DynamicResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="14"
+                    Margin="0,0,18,0">
+                <Grid RowDefinitions="Auto,Auto,Auto">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{DynamicResource LeftStick}" Foreground="White" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="{Binding LeftStickOutputText}" Foreground="{DynamicResource RgbGreenColor}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Border Grid.Row="1" Background="{DynamicResource ToggleContainerColor}" CornerRadius="8" Padding="10" Margin="0,10,0,10">
+                        <Viewbox Stretch="Uniform">
+                            <Canvas Width="240" Height="240" HorizontalAlignment="Center">
+                                <Ellipse Width="224" Height="224" Canvas.Left="8" Canvas.Top="8" Fill="{DynamicResource AltPanelBackgroundColor}" Stroke="{DynamicResource BorderColor}" StrokeThickness="1.4" />
+                                <Ellipse Width="{Binding StickMaxDeadzoneRingSize}" Height="{Binding StickMaxDeadzoneRingSize}" Canvas.Left="{Binding StickMaxDeadzoneRingOffset}" Canvas.Top="{Binding StickMaxDeadzoneRingOffset}" Stroke="{DynamicResource AccentColor}" StrokeThickness="1.5" Opacity="0.72" />
+                                <Ellipse Width="{Binding StickMinDeadzoneRingSize}" Height="{Binding StickMinDeadzoneRingSize}" Canvas.Left="{Binding StickMinDeadzoneRingOffset}" Canvas.Top="{Binding StickMinDeadzoneRingOffset}" Stroke="{DynamicResource ErrorColor}" StrokeThickness="1.5" Opacity="0.9" />
+                                <Line StartPoint="120,12" EndPoint="120,228" Stroke="{DynamicResource BorderHighlightColor}" StrokeThickness="0.8" Opacity="0.42" />
+                                <Line StartPoint="12,120" EndPoint="228,120" Stroke="{DynamicResource BorderHighlightColor}" StrokeThickness="0.8" Opacity="0.42" />
+                                <Ellipse Width="4" Height="4" Canvas.Left="118" Canvas.Top="118" Fill="{DynamicResource TextMutedColor}" />
+
+                                <Ellipse Width="10" Height="10" Canvas.Left="{Binding LeftStickInputDotX}" Canvas.Top="{Binding LeftStickInputDotY}" Fill="{DynamicResource AccentColor}" Stroke="#0F111A" StrokeThickness="1" Opacity="0.68" />
+                                <Ellipse Width="8" Height="8" Canvas.Left="{Binding LeftStickOutputDotX}" Canvas.Top="{Binding LeftStickOutputDotY}" Fill="{DynamicResource RgbGreenColor}" Stroke="White" StrokeThickness="1" Opacity="0.7" />
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+
+                    <Grid Grid.Row="2" ColumnDefinitions="*,*" Margin="0,0,0,10">
+                        <Border Background="{DynamicResource AltPanelBackgroundColor}" CornerRadius="8" Padding="10">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Ellipse Width="10" Height="10" Fill="{DynamicResource AccentColor}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                    <TextBlock Text="{DynamicResource Input}" Classes="metricLabel" />
+                                    <TextBlock Text="{Binding LeftStickInputMagnitudePercent, StringFormat={}{0:0}%}" Classes="metricValue" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Column="1" Background="{DynamicResource AltPanelBackgroundColor}" CornerRadius="8" Padding="10" Margin="8,0,0,0">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Ellipse Width="10" Height="10" Fill="{DynamicResource RgbGreenColor}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                    <TextBlock Text="{DynamicResource Output}" Classes="metricLabel" />
+                                    <TextBlock Text="{Binding LeftStickOutputMagnitudePercent, StringFormat={}{0:0}%}" Classes="metricValue" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Background="{DynamicResource PanelBackgroundColor}"
+                    BorderBrush="{DynamicResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="14"
+                    Margin="0,0,18,0">
+                <Grid RowDefinitions="Auto,Auto,Auto">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{DynamicResource RightStick}" Foreground="White" FontSize="15" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="{Binding RightStickOutputText}" Foreground="{DynamicResource RgbGreenColor}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    </Grid>
+
+                    <Border Grid.Row="1" Background="{DynamicResource ToggleContainerColor}" CornerRadius="8" Padding="10" Margin="0,10,0,10">
+                        <Viewbox Stretch="Uniform">
+                            <Canvas Width="240" Height="240" HorizontalAlignment="Center">
+                                <Ellipse Width="224" Height="224" Canvas.Left="8" Canvas.Top="8" Fill="{DynamicResource AltPanelBackgroundColor}" Stroke="{DynamicResource BorderColor}" StrokeThickness="1.4" />
+                                <Ellipse Width="{Binding StickMaxDeadzoneRingSize}" Height="{Binding StickMaxDeadzoneRingSize}" Canvas.Left="{Binding StickMaxDeadzoneRingOffset}" Canvas.Top="{Binding StickMaxDeadzoneRingOffset}" Stroke="{DynamicResource AccentColor}" StrokeThickness="1.5" Opacity="0.72" />
+                                <Ellipse Width="{Binding StickMinDeadzoneRingSize}" Height="{Binding StickMinDeadzoneRingSize}" Canvas.Left="{Binding StickMinDeadzoneRingOffset}" Canvas.Top="{Binding StickMinDeadzoneRingOffset}" Stroke="{DynamicResource ErrorColor}" StrokeThickness="1.5" Opacity="0.9" />
+                                <Line StartPoint="120,12" EndPoint="120,228" Stroke="{DynamicResource BorderHighlightColor}" StrokeThickness="0.8" Opacity="0.42" />
+                                <Line StartPoint="12,120" EndPoint="228,120" Stroke="{DynamicResource BorderHighlightColor}" StrokeThickness="0.8" Opacity="0.42" />
+                                <Ellipse Width="4" Height="4" Canvas.Left="118" Canvas.Top="118" Fill="{DynamicResource TextMutedColor}" />
+
+                                <Ellipse Width="10" Height="10" Canvas.Left="{Binding RightStickInputDotX}" Canvas.Top="{Binding RightStickInputDotY}" Fill="{DynamicResource AccentColor}" Stroke="#0F111A" StrokeThickness="1" Opacity="0.68" />
+                                <Ellipse Width="8" Height="8" Canvas.Left="{Binding RightStickOutputDotX}" Canvas.Top="{Binding RightStickOutputDotY}" Fill="{DynamicResource RgbGreenColor}" Stroke="White" StrokeThickness="1" Opacity="0.7" />
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+
+                    <Grid Grid.Row="2" ColumnDefinitions="*,*" Margin="0,0,0,10">
+                        <Border Background="{DynamicResource AltPanelBackgroundColor}" CornerRadius="8" Padding="10">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Ellipse Width="10" Height="10" Fill="{DynamicResource AccentColor}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                    <TextBlock Text="{DynamicResource Input}" Classes="metricLabel" />
+                                    <TextBlock Text="{Binding RightStickInputMagnitudePercent, StringFormat={}{0:0}%}" Classes="metricValue" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Column="1" Background="{DynamicResource AltPanelBackgroundColor}" CornerRadius="8" Padding="10" Margin="8,0,0,0">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Ellipse Width="10" Height="10" Fill="{DynamicResource RgbGreenColor}" VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                    <TextBlock Text="{DynamicResource Output}" Classes="metricLabel" />
+                                    <TextBlock Text="{Binding RightStickOutputMagnitudePercent, StringFormat={}{0:0}%}" Classes="metricValue" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="2"
+                    Background="{DynamicResource PanelBackgroundColor}"
+                    BorderBrush="{DynamicResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Padding="14">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
+                    <TextBlock Text="{DynamicResource Response}" Foreground="White" FontSize="15" FontWeight="SemiBold" />
+
+                    <Border Grid.Row="1" Background="{DynamicResource ToggleContainerColor}" CornerRadius="8" Padding="10" Margin="0,10,0,0">
+                        <Viewbox Stretch="Uniform">
+                            <Canvas Width="230" Height="106" HorizontalAlignment="Center">
+                                <Line StartPoint="0,96" EndPoint="220,96" Stroke="{DynamicResource BorderHighlightColor}" StrokeThickness="1" />
+                                <Line StartPoint="0,0" EndPoint="0,96" Stroke="{DynamicResource BorderHighlightColor}" StrokeThickness="1" />
+                                <Line StartPoint="0,72" EndPoint="220,72" Stroke="{DynamicResource BorderColor}" StrokeThickness="0.8" Opacity="0.72" />
+                                <Line StartPoint="0,48" EndPoint="220,48" Stroke="{DynamicResource BorderColor}" StrokeThickness="0.8" Opacity="0.72" />
+                                <Line StartPoint="0,24" EndPoint="220,24" Stroke="{DynamicResource BorderColor}" StrokeThickness="0.8" Opacity="0.72" />
+                                <Line StartPoint="55,0" EndPoint="55,96" Stroke="{DynamicResource BorderColor}" StrokeThickness="0.8" Opacity="0.72" />
+                                <Line StartPoint="110,0" EndPoint="110,96" Stroke="{DynamicResource BorderColor}" StrokeThickness="0.8" Opacity="0.72" />
+                                <Line StartPoint="165,0" EndPoint="165,96" Stroke="{DynamicResource BorderColor}" StrokeThickness="0.8" Opacity="0.72" />
+
+                                <Polyline Points="{Binding StickCurvePoints}"
+                                          Stroke="{DynamicResource AccentColor}"
+                                          StrokeThickness="2"
+                                          StrokeLineCap="Round"
+                                          StrokeJoin="Round" />
+
+                                <Thumb Name="StickCurveThumb0" Classes="curveDot" IsVisible="{Binding IsStickCurveCustom}" Canvas.Left="-6" Canvas.Top="90" DragDelta="OnStickCurveThumbDragDelta" />
+                                <Thumb Name="StickCurveThumb1" Classes="curveDot" IsVisible="{Binding IsStickCurveCustom}" Canvas.Left="49" Canvas.Top="66" DragDelta="OnStickCurveThumbDragDelta" />
+                                <Thumb Name="StickCurveThumb2" Classes="curveDot" IsVisible="{Binding IsStickCurveCustom}" Canvas.Left="104" Canvas.Top="42" DragDelta="OnStickCurveThumbDragDelta" />
+                                <Thumb Name="StickCurveThumb3" Classes="curveDot" IsVisible="{Binding IsStickCurveCustom}" Canvas.Left="159" Canvas.Top="18" DragDelta="OnStickCurveThumbDragDelta" />
+                                <Thumb Name="StickCurveThumb4" Classes="curveDot" IsVisible="{Binding IsStickCurveCustom}" Canvas.Left="214" Canvas.Top="-6" DragDelta="OnStickCurveThumbDragDelta" />
+
+                                <Ellipse Width="8" Height="8"
+                                         Canvas.Left="{Binding LeftStickCurveMarkerX}"
+                                         Canvas.Top="{Binding LeftStickCurveMarkerY}"
+                                         Fill="{DynamicResource RgbGreenColor}"
+                                         Stroke="#0F111A"
+                                         StrokeThickness="1"
+                                         Opacity="0.74" />
+                                <Ellipse Width="8" Height="8"
+                                         Canvas.Left="{Binding RightStickCurveMarkerX}"
+                                         Canvas.Top="{Binding RightStickCurveMarkerY}"
+                                         Fill="{DynamicResource AccentColor}"
+                                         Stroke="#0F111A"
+                                         StrokeThickness="1"
+                                         Opacity="0.74" />
+                            </Canvas>
+                        </Viewbox>
+                    </Border>
+
+                    <StackPanel Grid.Row="2" Spacing="6" Margin="0,12,0,0">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{DynamicResource DeadzoneMin}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="10" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1" Text="{Binding StickDeadzoneMinPercent, StringFormat={}{0:0}%}" Foreground="{DynamicResource ErrorColor}" FontSize="10" FontWeight="SemiBold" />
+                        </Grid>
+                        <Slider Minimum="0" Maximum="40" Value="{Binding StickDeadzoneMinPercent, Mode=TwoWay}" Foreground="{DynamicResource ErrorColor}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="3" Spacing="6" Margin="0,12,0,0">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{DynamicResource DeadzoneMax}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="10" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1" Text="{Binding StickDeadzoneMaxPercent, StringFormat={}{0:0}%}" Foreground="{DynamicResource AccentColor}" FontSize="10" FontWeight="SemiBold" />
+                        </Grid>
+                        <Slider Minimum="60" Maximum="100" Value="{Binding StickDeadzoneMaxPercent, Mode=TwoWay}" Foreground="{DynamicResource AccentColor}" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="4" VerticalAlignment="Bottom" Spacing="10">
+                        <Border Height="1" Background="{DynamicResource BorderColor}" />
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Ellipse Width="10" Height="10" Fill="{DynamicResource AccentColor}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{DynamicResource OriginalInput}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="10" Margin="8,0,0,0" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Ellipse Width="10" Height="10" Fill="{DynamicResource RgbGreenColor}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{DynamicResource AppliedOutput}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="10" Margin="8,0,0,0" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Ellipse Width="10" Height="10" Stroke="{DynamicResource ErrorColor}" StrokeThickness="1.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{DynamicResource DeadzoneMin}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="10" Margin="8,0,0,0" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Ellipse Width="10" Height="10" Stroke="{DynamicResource AccentColor}" StrokeThickness="1.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{DynamicResource DeadzoneMax}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="10" Margin="8,0,0,0" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

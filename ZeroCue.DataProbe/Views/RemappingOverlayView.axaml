@@ -1,0 +1,997 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ZeroCue.DataProbe.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:DataType="vm:MainViewModel"
+             xmlns:views="using:ZeroCue.DataProbe.Views"
+             xmlns:controls="using:ZeroCue.DataProbe.Controls"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:Class="ZeroCue.DataProbe.Views.RemappingOverlayView">
+
+        <Grid IsVisible="{Binding IsRemapping}">
+
+            <!-- Overlay que cierra al hacer clic fuera -->
+            <Button Command="{Binding CancelRemapCommand}" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" CornerRadius="0" BorderThickness="0" Padding="0">
+                <Button.Template>
+                    <ControlTemplate>
+                        <Border Background="{DynamicResource OverlayBackgroundColor}"/>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+
+            <Border Background="{DynamicResource PanelBackgroundColor}" CornerRadius="14" BorderBrush="{DynamicResource BorderHighlightColor}" BorderThickness="2"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="24" Padding="18"
+                    MaxWidth="1120" MaxHeight="780">
+
+                <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,Auto">
+
+                    <!-- Close button kept hidden; the overlay itself handles outside-click close. -->
+                    <Button Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="False"
+                            Command="{Binding CancelRemapCommand}"
+                            Background="Transparent" Foreground="{DynamicResource TextMutedColor}"
+                            BorderThickness="0" FontSize="18" FontWeight="Bold" Padding="9,5" Margin="10,0,0,0"
+                            ToolTip.Tip="{DynamicResource Close}">
+                        <TextBlock Text="X" />
+                    </Button>
+
+                    <Grid.Styles>
+                        <Style Selector="Button.gestureTab">
+                            <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryColor}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="CornerRadius" Value="6"/>
+                            <Setter Property="Padding" Value="12,7"/>
+                            <Setter Property="FontSize" Value="13"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Style>
+                        <Style Selector="Button.gestureTab.active">
+                            <Setter Property="Background" Value="{DynamicResource AccentColor}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AppBackgroundColor}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                        </Style>
+                            <Style Selector="Button.addGestureBtn">
+                                <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="CornerRadius" Value="6"/>
+                            <Setter Property="Padding" Value="11,7"/>
+                                <Setter Property="FontSize" Value="16"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </Style>
+                            <Style Selector="MenuFlyoutPresenter">
+                                <Setter Property="Background" Value="{DynamicResource PanelBackgroundColor}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="CornerRadius" Value="8"/>
+                                <Setter Property="Padding" Value="6"/>
+                            </Style>
+                            <Style Selector="MenuItem">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+                                <Setter Property="FontSize" Value="13"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="Padding" Value="12,8"/>
+                                <Setter Property="Margin" Value="0,1"/>
+                                <Setter Property="CornerRadius" Value="6"/>
+                            </Style>
+                            <Style Selector="MenuItem:pointerover">
+                                <Setter Property="Background" Value="{DynamicResource BorderHighlightColor}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                            </Style>
+                            <Style Selector="Button.inputTab">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryColor}"/>
+                                <Setter Property="FontSize" Value="14"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                            </Style>
+                            <Style Selector="Button.inputTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                            </Style>
+                            <Style Selector="Button.inputTab:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                            </Style>
+                            <Style Selector="Button.inputTab.active">
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                            </Style>
+                            <Style Selector="Border.inputTabUnderline">
+                                <Setter Property="Height" Value="2"/>
+                                <Setter Property="Margin" Value="0,8,0,0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                            </Style>
+                            <Style Selector="Button.inputTab.active Border.inputTabUnderline">
+                                <Setter Property="Background" Value="{DynamicResource AccentColor}"/>
+                            </Style>
+                            <Style Selector="Border.mappingContextChip">
+                                <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="CornerRadius" Value="8"/>
+                                <Setter Property="Padding" Value="12,7"/>
+                                <Setter Property="MinWidth" Value="138"/>
+                            </Style>
+                            <Style Selector="TextBlock.mappingContextLabel">
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryColor}"/>
+                                <Setter Property="FontSize" Value="11"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Style>
+                            <Style Selector="TextBlock.mappingContextValue">
+                                <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+                                <Setter Property="FontSize" Value="15"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            </Style>
+                            <Style Selector="Button.footerAction">
+                                <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="CornerRadius" Value="7"/>
+                                <Setter Property="Padding" Value="16,9"/>
+                                <Setter Property="FontSize" Value="13"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                            </Style>
+                            <Style Selector="Button.footerAction:pointerover">
+                                <Setter Property="Background" Value="{DynamicResource BorderHighlightColor}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+                            </Style>
+                            <Style Selector="Button.footerAction.danger">
+                                <Setter Property="Foreground" Value="{DynamicResource ErrorColor}"/>
+                            </Style>
+                    </Grid.Styles>
+
+                    <Border Grid.Row="0" Grid.ColumnSpan="2" BorderBrush="{DynamicResource BorderHighlightColor}" BorderThickness="0,0,0,1" IsHitTestVisible="False"/>
+
+                    <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="36" Margin="38,0,0,0">
+                        <Button Classes="inputTab" Classes.active="{Binding IsRemapInputTabXbox}" Command="{Binding SelectRemapInputTabCommand}" CommandParameter="0">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource XboxController}"/>
+                                <Border Classes="inputTabUnderline"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="inputTab" Classes.active="{Binding IsRemapInputTabKeyboard}" Command="{Binding SelectRemapInputTabCommand}" CommandParameter="1">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Keyboard}"/>
+                                <Border Classes="inputTabUnderline"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="inputTab" Classes.active="{Binding IsRemapInputTabMouse}" Command="{Binding SelectRemapInputTabCommand}" CommandParameter="2">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Mouse}"/>
+                                <Border Classes="inputTabUnderline"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="inputTab" Classes.active="{Binding IsRemapInputTabAction}" Command="{Binding SelectRemapInputTabCommand}" CommandParameter="3" IsVisible="{Binding IsActionInputTabEnabled}">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Actions}"/>
+                                <Border Classes="inputTabUnderline"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="inputTab" Classes.active="{Binding IsRemapInputTabMacro}" Command="{Binding SelectRemapInputTabCommand}" CommandParameter="4">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource Macro}"/>
+                                <Border Classes="inputTabUnderline"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <Button Grid.Row="0" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Command="{Binding CancelRemapCommand}"
+                            Background="Transparent" Foreground="{DynamicResource TextMutedColor}"
+                            BorderThickness="0" FontSize="18" FontWeight="Bold" Padding="9,5" Margin="10,0,0,0"
+                            ToolTip.Tip="{DynamicResource Close}">
+                        <TextBlock Text="X" />
+                    </Button>
+
+                    <Grid Grid.Row="1" Grid.ColumnSpan="2" RowDefinitions="*" Background="Transparent" Margin="0" VerticalAlignment="Stretch">
+
+                        <Grid.Styles>
+
+                            <Style Selector="TabItem">
+
+                                <Setter Property="FontSize" Value="14"/>
+
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryColor}"/>
+
+                                <Setter Property="Margin" Value="8,0,28,0"/>
+
+                                <Setter Property="Padding" Value="0,8"/>
+
+                                <Setter Property="MinWidth" Value="0"/>
+
+                            </Style>
+
+                            <Style Selector="TabItem:selected">
+
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+
+                            </Style>
+
+                            <Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+
+                                <Setter Property="Background" Value="{DynamicResource AccentColor}"/>
+
+                            </Style>
+
+                            <Style Selector="Button.keyBtn">
+
+                                <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+
+                                <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+
+                                <Setter Property="CornerRadius" Value="6"/>
+
+                                <Setter Property="FontSize" Value="14"/>
+
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+
+                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+
+                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+
+                                <Setter Property="BorderThickness" Value="1"/>
+
+                                <Setter Property="Padding" Value="5"/>
+
+                            </Style>
+
+                            <Style Selector="Button.keyBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+
+                                <Setter Property="Background" Value="{DynamicResource BorderHighlightColor}"/>
+
+                                <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+
+                            </Style>
+
+                            <Style Selector="Button.inputTab">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryColor}"/>
+                                <Setter Property="FontSize" Value="14"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                            </Style>
+
+                            <Style Selector="Button.inputTab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                            </Style>
+
+                            <Style Selector="Button.inputTab:pressed /template/ ContentPresenter#PART_ContentPresenter">
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                            </Style>
+
+                            <Style Selector="Button.inputTab.active">
+                                <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+                            </Style>
+
+                            <Style Selector="Border.inputTabUnderline">
+                                <Setter Property="Height" Value="2"/>
+                                <Setter Property="Margin" Value="0,8,0,0"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                            </Style>
+
+                            <Style Selector="Button.inputTab.active Border.inputTabUnderline">
+                                <Setter Property="Background" Value="{DynamicResource AccentColor}"/>
+                            </Style>
+
+                        </Grid.Styles>
+
+                        <Carousel Grid.Row="0" SelectedIndex="{Binding RemapInputTabIndex}" Background="Transparent" Margin="0,14,0,0">
+                            <Carousel.PageTransition>
+                                <views:DirectionalFadeSlideTransition Duration="0:0:0.26" SlideDistance="44" />
+                            </Carousel.PageTransition>
+
+
+
+                        <!-- Xbox tab -->
+                        <Panel>
+                            <views:XboxControllerVectorView Margin="0,10" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                        </Panel>
+
+
+
+                        <!-- Keyboard tab -->
+
+                        <Panel>
+
+                            <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Background="{DynamicResource HeaderBackgroundColor}"
+                                    BorderBrush="{DynamicResource BorderHighlightColor}" BorderThickness="1"
+                                    CornerRadius="8" Padding="14" Margin="0,8"
+                                    BoxShadow="0 8 18 0 #28000000">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="20" Margin="0">
+
+                                <!-- Teclado Principal -->
+
+                                <StackPanel>
+
+                                    <!-- Fila F -->
+
+                                    <UniformGrid Columns="14" Margin="0,0,0,10">
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Escape" Content="Esc"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F1" Content="F1"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F2" Content="F2"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F3" Content="F3"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F4" Content="F4"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F5" Content="F5"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F6" Content="F6"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F7" Content="F7"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F8" Content="F8"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F9" Content="F9"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F10" Content="F10"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F11" Content="F11"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="F12" Content="F12"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Delete" Content="Del"/>
+
+                                    </UniformGrid>
+
+
+
+                                    <!-- Numeros -->
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="OemTilde" Content="`"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D1" Content="1"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D2" Content="2"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D3" Content="3"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D4" Content="4"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D5" Content="5"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D6" Content="6"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D7" Content="7"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D8" Content="8"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D9" Content="9"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="D0" Content="0"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Subtract" Content="-"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Add" Content="="/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="70" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Backspace" Content="Bspc"/>
+
+                                    </StackPanel>
+
+
+
+                                    <!-- QWERTY -->
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                                        <Button Classes="keyBtn" Margin="2" Width="60" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Tab" Content="Tab"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyQ" Content="Q"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyW" Content="W"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyE" Content="E"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyR" Content="R"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyT" Content="T"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyY" Content="Y"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyU" Content="U"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyI" Content="I"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyO" Content="O"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyP" Content="P"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="OemOpenBrackets" Content="["/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="OemCloseBrackets" Content="]"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="55" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="OemPipe" Content="\"/>
+
+                                    </StackPanel>
+
+
+
+                                    <!-- ASDFG -->
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                                        <Button Classes="keyBtn" Margin="2" Width="70" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Capital" Content="Caps"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyA" Content="A"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyS" Content="S"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyD" Content="D"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyF" Content="F"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyG" Content="G"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyH" Content="H"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyJ" Content="J"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyK" Content="K"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyL" Content="L"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="OemSemicolon" Content=";"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="OemQuotes" Content="'"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="90" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Return" Content="Enter"/>
+
+                                    </StackPanel>
+
+
+
+                                    <!-- ZXCVB -->
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                                        <Button Classes="keyBtn" Margin="2" Width="95" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="LeftShift" Content="{DynamicResource Shift}"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyZ" Content="Z"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyX" Content="X"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyC" Content="C"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyV" Content="V"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyB" Content="B"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyN" Content="N"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="KeyM" Content="M"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="OemComma" Content=","/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="OemPeriod" Content="."/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="OemQuestion" Content="/"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="85" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="RightShift" Content="{DynamicResource Shift}"/>
+
+                                    </StackPanel>
+
+
+
+                                    <!-- Bottom Row -->
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+
+                                        <Button Classes="keyBtn" Margin="2" Width="60" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="LeftCtrl" Content="Ctrl"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="60" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="LWin" Content="Win"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="60" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="LeftAlt" Content="Alt"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="300" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Space" Content="Space"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="60" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="RightAlt" Content="Alt"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="60" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="RightCtrl" Content="Ctrl"/>
+
+                                    </StackPanel>
+
+                                </StackPanel>
+
+
+
+                                <!-- Numpad y Extras -->
+
+                                <StackPanel>
+
+                                    <!-- Flechas y Extras Arriba -->
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Insert" Content="Ins"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Home" Content="Home"/>
+
+                                        <Button Classes="keyBtn" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="PageUp" Content="PgUp"/>
+
+                                    </StackPanel>
+
+
+
+                                    <!-- Numpad Grid -->
+
+                                    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto,Auto">
+
+                                        <Button Classes="keyBtn" Grid.Row="0" Grid.Column="0" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumLock" Content="Num"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="0" Grid.Column="1" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Divide" Content="/"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="0" Grid.Column="2" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Multiply" Content="*"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="0" Grid.Column="3" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="Subtract" Content="-"/>
+
+
+
+                                        <Button Classes="keyBtn" Grid.Row="1" Grid.Column="0" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad7" Content="7"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="1" Grid.Column="1" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad8" Content="8"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="1" Grid.Column="2" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad9" Content="9"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="1" Grid.Column="3" Grid.RowSpan="2" Margin="2" Width="45" Height="94" Command="{Binding ManualMapCommand}" CommandParameter="Add" Content="+"/>
+
+
+
+                                        <Button Classes="keyBtn" Grid.Row="2" Grid.Column="0" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad4" Content="4"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="2" Grid.Column="1" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad5" Content="5"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="2" Grid.Column="2" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad6" Content="6"/>
+
+
+
+                                        <Button Classes="keyBtn" Grid.Row="3" Grid.Column="0" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad1" Content="1"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="3" Grid.Column="1" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad2" Content="2"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="3" Grid.Column="2" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad3" Content="3"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="3" Grid.Column="3" Grid.RowSpan="2" Margin="2" Width="45" Height="94" Command="{Binding ManualMapCommand}" CommandParameter="Return" Content="Ent"/>
+
+
+                                        <Button Classes="keyBtn" Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2" Margin="2" Width="94" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumPad0" Content="0"/>
+
+                                        <Button Classes="keyBtn" Grid.Row="4" Grid.Column="2" Margin="2" Width="45" Height="45" Command="{Binding ManualMapCommand}" CommandParameter="NumpadDecimal" Content="."/>
+
+                                    </Grid>
+
+                                </StackPanel>
+
+                            </StackPanel>
+                            </Border>
+
+                        </Panel>
+
+
+
+                        <!-- Mouse tab -->
+
+                        <Panel>
+                            <views:MouseVectorView Margin="0,10" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                        </Panel>
+
+                        <!-- Actions tab -->
+
+                        <Panel>
+                            <Panel.Styles>
+                                <Style Selector="Button.actionBtn">
+                                    <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}" />
+                                    <Setter Property="BorderThickness" Value="1" />
+                                    <Setter Property="CornerRadius" Value="8" />
+                                    <Setter Property="Padding" Value="16" />
+                                    <Setter Property="HorizontalAlignment" Value="Center" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Left" />
+                                    <Setter Property="Width" Value="400" />
+                                    <Setter Property="RenderTransform" Value="scale(1)" />
+                                    <Setter Property="Cursor" Value="Hand" />
+                                    <Setter Property="Transitions">
+                                        <Transitions>
+                                            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1" Easing="CubicEaseOut" />
+                                        </Transitions>
+                                    </Setter>
+                                </Style>
+
+                                <Style Selector="Button.actionBtn /template/ ContentPresenter#PART_ContentPresenter">
+                                    <Setter Property="Transitions">
+                                        <Transitions>
+                                            <BrushTransition Property="Background" Duration="0:0:0.15" />
+                                            <BrushTransition Property="BorderBrush" Duration="0:0:0.15" />
+                                        </Transitions>
+                                    </Setter>
+                                </Style>
+
+                                <Style Selector="Button.actionBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                                    <Setter Property="Background" Value="{DynamicResource AccentHoverColor}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}" />
+                                </Style>
+
+                                <Style Selector="Button.actionBtn:pressed">
+                                    <Setter Property="RenderTransform" Value="scale(0.98)" />
+                                </Style>
+
+                                <Style Selector="Border.actionCardStatic">
+                                    <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}" />
+                                    <Setter Property="BorderThickness" Value="1" />
+                                    <Setter Property="CornerRadius" Value="8" />
+                                    <Setter Property="Padding" Value="16" />
+                                    <Setter Property="Width" Value="400" />
+                                </Style>
+
+                                <Style Selector="Button.primaryActionBtn">
+                                    <Setter Property="RenderTransform" Value="scale(1)" />
+                                    <Setter Property="Cursor" Value="Hand" />
+                                    <Setter Property="Transitions">
+                                        <Transitions>
+                                            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1" Easing="CubicEaseOut" />
+                                            <BrushTransition Property="Background" Duration="0:0:0.15" />
+                                        </Transitions>
+                                    </Setter>
+                                </Style>
+                                <Style Selector="Button.primaryActionBtn:pointerover">
+                                    <Setter Property="RenderTransform" Value="scale(1.05)" />
+                                </Style>
+                                <Style Selector="Button.primaryActionBtn:pressed">
+                                    <Setter Property="RenderTransform" Value="scale(0.95)" />
+                                </Style>
+                            </Panel.Styles>
+
+                            <StackPanel Spacing="16" Margin="24" HorizontalAlignment="Center">
+                                <Button Classes="actionBtn" Command="{Binding MapActionCommand}" CommandParameter="Shift">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <materialIcons:MaterialIcon Kind="AppleKeyboardShift" Width="24" Height="24" Foreground="{DynamicResource TextHeaderColor}"/>
+                                        <TextBlock Text="{DynamicResource AssignShiftModifier}" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeaderColor}"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Classes="actionBtn" Command="{Binding MapActionCommand}" CommandParameter="EcoMode">
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <materialIcons:MaterialIcon Kind="Leaf" Width="24" Height="24" Foreground="{DynamicResource TextHeaderColor}"/>
+                                        <TextBlock Text="{DynamicResource ToggleEcoMode}" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHeaderColor}"/>
+                                    </StackPanel>
+                                </Button>
+                                <Border Classes="actionCardStatic">
+                                    <StackPanel Spacing="16">
+                                        <!-- Header -->
+                                        <StackPanel Orientation="Horizontal" Spacing="14">
+                                            <Border Background="{DynamicResource ToggleContainerColor}" CornerRadius="8" Padding="10">
+                                                <materialIcons:MaterialIcon Kind="AccountSwitch" Width="24" Height="24" Foreground="{DynamicResource AccentColor}"/>
+                                            </Border>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{DynamicResource LoadProfile}" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextHeaderColor}"/>
+                                            </StackPanel>
+                                        </StackPanel>
+
+                                        <Border Height="1" Background="{DynamicResource BorderHighlightColor}" Margin="0,2"/>
+
+                                        <!-- Controls -->
+                                        <StackPanel Spacing="14">
+                                            <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding ActionSelectedProfile}" HorizontalAlignment="Stretch" PlaceholderText="{DynamicResource SelectDestinationProfile}" MinHeight="38" IsEnabled="{Binding IsLoadProfileActionEnabled}"/>
+
+                                            <Grid ColumnDefinitions="*" Margin="0,4,0,0">
+                                                <CheckBox Grid.Column="0" IsChecked="{Binding ActionProfileWhileHeld}" IsEnabled="{Binding IsProfileWhileHeldCheckboxEnabled}" Foreground="{DynamicResource TextHeaderColor}" VerticalAlignment="Center">
+                                                    <TextBlock Text="{DynamicResource ProfileWhileHeld}" FontSize="13" TextWrapping="Wrap"/>
+                                                </CheckBox>
+                                            </Grid>
+                                            <TextBlock Text="{Binding ProfileActionConstraintText}" IsVisible="{Binding HasProfileActionConstraint}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="12" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Panel>
+
+                        <!-- Macro tab -->
+
+                        <Panel>
+                            <Grid ColumnDefinitions="290,*" Margin="12,12,12,6">
+                                <Border Grid.Column="0"
+                                        Background="{DynamicResource HeaderBackgroundColor}"
+                                        BorderBrush="{DynamicResource BorderHighlightColor}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="12">
+                                    <StackPanel Spacing="14">
+
+                                        <!-- MACRO LIBRARY -->
+                                        <Border Background="{DynamicResource HeaderBackgroundColor}" CornerRadius="8" Padding="12" BorderBrush="{DynamicResource BorderHighlightColor}" BorderThickness="1" Margin="0,0,0,4">
+                                            <StackPanel Spacing="10">
+                                                <TextBlock Text="{DynamicResource MacroLibrary}" Foreground="{DynamicResource TextHeaderColor}" FontSize="14" FontWeight="Bold"/>
+
+                                                <Button Classes="footerAction" Padding="0,10" Command="{Binding OpenLoadMacroDialogCommand}" IsEnabled="{Binding HasSavedMacros}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="18" Height="18" />
+                                                        <TextBlock Text="{DynamicResource LoadSavedMacro}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
+                                                    </StackPanel>
+                                                </Button>
+
+                                                <Button Classes="footerAction" Padding="0,10" Command="{Binding OpenSaveMacroDialogCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                        <materialIcons:MaterialIcon Kind="ContentSaveOutline" Width="18" Height="18" />
+                                                        <TextBlock Text="{DynamicResource SaveAs}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border BorderBrush="{DynamicResource BorderHighlightColor}" BorderThickness="0,1,0,0" Margin="0,4"/>
+                                        <Button Classes="footerAction" Padding="0,16" Command="{Binding ToggleMacroRecordingCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                <Ellipse Width="12" Height="12" Fill="#FF3333" IsVisible="{Binding IsMacroRecording}">
+                                                    <Ellipse.Styles>
+                                                        <Style Selector="Ellipse">
+                                                            <Style.Animations>
+                                                                <Animation Duration="0:0:1" IterationCount="Infinite">
+                                                                    <KeyFrame Cue="0%">
+                                                                        <Setter Property="Opacity" Value="1.0"/>
+                                                                    </KeyFrame>
+                                                                    <KeyFrame Cue="50%">
+                                                                        <Setter Property="Opacity" Value="0.2"/>
+                                                                    </KeyFrame>
+                                                                    <KeyFrame Cue="100%">
+                                                                        <Setter Property="Opacity" Value="1.0"/>
+                                                                    </KeyFrame>
+                                                                </Animation>
+                                                            </Style.Animations>
+                                                        </Style>
+                                                    </Ellipse.Styles>
+                                                </Ellipse>
+                                                <materialIcons:MaterialIcon Kind="RecordCircleOutline" Width="22" Height="22" Foreground="{DynamicResource TextHeaderColor}" IsVisible="{Binding !IsMacroRecording}"/>
+                                                <TextBlock Text="{DynamicResource MacroStopRecording}" IsVisible="{Binding IsMacroRecording}" VerticalAlignment="Center" FontSize="15" FontWeight="Bold"/>
+                                                <TextBlock Text="{DynamicResource MacroStartRecording}" IsVisible="{Binding !IsMacroRecording}" VerticalAlignment="Center" FontSize="15" FontWeight="Bold"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Button Classes="footerAction danger" Padding="0,12" Command="{Binding ClearMacroCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="DeleteOutline" Width="20" Height="20" />
+                                                <TextBlock Text="{DynamicResource MacroClear}" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <Border BorderBrush="{DynamicResource BorderHighlightColor}" BorderThickness="0,1,0,0" Margin="0,4"/>
+
+                                        <CheckBox IsChecked="{Binding MacroRepeatWhileHeld}" Foreground="{DynamicResource TextHeaderColor}" FontSize="13" FontWeight="SemiBold">
+                                            <TextBlock Text="{DynamicResource MacroRepeatWhileHeld}" TextWrapping="Wrap"/>
+                                        </CheckBox>
+
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <CheckBox IsChecked="{Binding MacroRecordFixedDelay}" Foreground="{DynamicResource TextHeaderColor}" FontSize="13" FontWeight="SemiBold">
+                                                <TextBlock Text="{DynamicResource MacroRecordFixedDelay}" TextWrapping="Wrap"/>
+                                            </CheckBox>
+                                            <TextBox Text="{Binding MacroFixedDelayMs}" IsEnabled="{Binding MacroRecordFixedDelay}" Width="50" Height="26" MinHeight="26" Padding="6,2" VerticalContentAlignment="Center" HorizontalContentAlignment="Center" FontSize="13"/>
+                                            <TextBlock Text="ms" Foreground="{DynamicResource TextSecondaryColor}" FontSize="13" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Column="1"
+                                        Margin="12,0,0,0"
+                                        Background="{DynamicResource HeaderBackgroundColor}"
+                                        BorderBrush="{DynamicResource BorderHighlightColor}"
+                                        BorderThickness="1"
+                                        CornerRadius="8"
+                                        Padding="10">
+                                    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                                            <ItemsControl ItemsSource="{Binding MacroFlowItems}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center"/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:MacroFlowItemViewModel">
+                                                        <Grid VerticalAlignment="Center" Margin="0,0,12,12" Background="Transparent">
+                                                            <Grid.ContextMenu>
+                                                                <ContextMenu>
+                                                                    <MenuItem Header="{DynamicResource Delete}"
+                                                                      Command="{Binding RemoveCommand}"
+                                                                              CommandParameter="{Binding Step}">
+                                                                        <MenuItem.Icon>
+                                                                            <materialIcons:MaterialIcon Kind="Delete" Width="16" Height="16"/>
+                                                                        </MenuItem.Icon>
+                                                                    </MenuItem>
+                                                                </ContextMenu>
+                                                            </Grid.ContextMenu>
+
+                                                            <Border IsVisible="{Binding IsAction}"
+                                                                    Width="62"
+                                                                    Height="54"
+                                                                    Background="#363A42"
+                                                                    BorderBrush="{DynamicResource BorderHighlightColor}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="8"
+                                                                    Padding="6,3,2,3">
+                                                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="0">
+                                                                    <Grid Width="34" Height="34">
+                                                                        <Image Source="{Binding Step.TargetIcon}" IsVisible="{Binding Step.HasTargetIcon}" Stretch="Uniform"/>
+                                                                        <controls:GenericMappingIcon Text="{Binding Step.TargetFallbackText}" Width="34" Height="34" CornerRadius="6" IsVisible="{Binding Step.HasTargetFallback}"/>
+                                                                    </Grid>
+                                                                    <materialIcons:MaterialIcon Kind="{Binding Step.ActionIconKind}"
+                                                                                                Width="18"
+                                                                                                Height="18"
+                                                                                                Foreground="{DynamicResource AccentColor}"
+                                                                                                VerticalAlignment="Center"
+                                                                                                Margin="2,0,0,0"/>
+                                                                </StackPanel>
+                                                            </Border>
+
+                                                            <Border IsVisible="{Binding IsDelay}"
+                                                                    Width="62"
+                                                                    Height="54"
+                                                                    Background="#363A42"
+                                                                    BorderBrush="{DynamicResource BorderHighlightColor}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="8"
+                                                                    Padding="4">
+                                                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="0">
+                                                                    <materialIcons:MaterialIcon Kind="ArrowRight" Width="26" Height="18" Foreground="{DynamicResource AccentColor}" HorizontalAlignment="Center" Margin="0,0,0,2"/>
+                                                                    <TextBox Text="{Binding DelayMsText}" Width="54" Height="22" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="13" FontWeight="Bold" Padding="0" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource TextHeaderColor}">
+                                                                        <TextBox.Styles>
+                                                                            <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+                                                                                <Setter Property="Background" Value="Transparent" />
+                                                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                                            </Style>
+                                                                            <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+                                                                                <Setter Property="Background" Value="Transparent" />
+                                                                                <Setter Property="BorderBrush" Value="Transparent" />
+                                                                                <Setter Property="BorderThickness" Value="0" />
+                                                                            </Style>
+                                                                        </TextBox.Styles>
+                                                                    </TextBox>
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                    </ScrollViewer>
+                                </Border>
+                            </Grid>
+                        </Panel>
+
+
+
+                        </Carousel>
+                    </Grid>
+
+                    <Border Grid.Row="2" Grid.ColumnSpan="2" BorderBrush="{DynamicResource BorderHighlightColor}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+                        <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Spacing="14">
+                                <Border Classes="mappingContextChip" MinWidth="150">
+                                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <TextBlock Classes="mappingContextLabel" Text="{DynamicResource Mapping}" VerticalAlignment="Center"/>
+                                        <Grid Width="52" Height="40" VerticalAlignment="Center">
+                                            <Image Source="{Binding RemappingTargetIcon}" IsVisible="{Binding HasRemappingTargetIcon}" Stretch="Uniform"/>
+                                            <controls:GenericMappingIcon Text="{Binding RemappingTargetFallbackText}" Width="52" Height="40" CornerRadius="7" IsVisible="{Binding HasRemappingTargetFallback}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="mappingContextChip" MinWidth="190">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Classes="mappingContextLabel" Text="{DynamicResource Action}"/>
+                                        <TextBlock Classes="mappingContextValue" Text="{Binding SelectedRemapActionDisplayName}" MaxWidth="170"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="mappingContextChip" MinWidth="132" IsVisible="{Binding IsGestureDelayEditorVisible}">
+                                    <Grid ColumnDefinitions="*,58" VerticalAlignment="Center">
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock Classes="mappingContextLabel" Text="{Binding SelectedGestureDelayLabel}"/>
+                                            <TextBlock Classes="mappingContextValue" Text="ms" FontSize="12"/>
+                                        </StackPanel>
+                                        <TextBox Grid.Column="1"
+                                                 Text="{Binding SelectedGestureDelayMs, Mode=TwoWay}"
+                                                 Width="58"
+                                                 MinHeight="28"
+                                                 Margin="8,0,0,0"
+                                                 Padding="6,2"
+                                                 HorizontalContentAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 FontSize="13"/>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="10">
+                                <Button Classes="footerAction" Content="{DynamicResource Reset}" Command="{Binding RestoreRemapCommand}" ToolTip.Tip="{DynamicResource RestoreOriginalMapping}"/>
+                                <Button Classes="footerAction danger" Content="{DynamicResource Unmap}" Command="{Binding UnmapRemapCommand}" ToolTip.Tip="{DynamicResource UnmapTip}"/>
+                                <Button Classes="footerAction" Content="{DynamicResource Accept}" Command="{Binding AcceptRemapCommand}"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                </Grid>
+            </Border>
+
+            <!-- SAVE MACRO DIALOG OVERLAY -->
+            <Grid Background="#B2000000" ZIndex="100" IsVisible="{Binding IsSaveMacroDialogOpen}">
+                <Border Background="{DynamicResource PanelBackgroundColor}"
+                        BorderBrush="{DynamicResource BorderHighlightColor}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="20"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="350">
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="{DynamicResource SaveMacro}" Foreground="{DynamicResource TextHeaderColor}" FontSize="18" FontWeight="Bold"/>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{DynamicResource MacroName}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="14"/>
+                            <TextBox Text="{Binding NewMacroName}" Watermark="{DynamicResource MacroNameWatermark}" FontSize="14" MinHeight="32"/>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10" Margin="0,10,0,0">
+                            <Button Classes="footerAction" Content="{DynamicResource Cancel}" Command="{Binding CancelSaveMacroCommand}" Padding="16,8"/>
+                            <Button Classes="footerAction" Content="{DynamicResource Save}" Command="{Binding ConfirmSaveMacroCommand}" Padding="16,8" Background="{DynamicResource AccentColor}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- LOAD MACRO DIALOG OVERLAY -->
+            <Grid Background="#B2000000" ZIndex="100" IsVisible="{Binding IsLoadMacroDialogOpen}">
+                <Border Background="{DynamicResource PanelBackgroundColor}"
+                        BorderBrush="{DynamicResource BorderHighlightColor}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="20"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Width="400"
+                        MaxHeight="500">
+                    <Grid RowDefinitions="Auto,*,Auto">
+                        <TextBlock Grid.Row="0" Text="{DynamicResource LoadMacro}" Foreground="{DynamicResource TextHeaderColor}" FontSize="18" FontWeight="Bold" Margin="0,0,0,16"/>
+
+                        <ScrollViewer Grid.Row="1" Margin="0,0,0,16" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding SavedMacros}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="{DynamicResource BorderHighlightColor}" BorderThickness="0,0,0,1" Padding="8,12">
+                                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                                <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="15" VerticalAlignment="Center" />
+                                                <Button Grid.Column="1" Classes="footerAction" Content="{DynamicResource Load}" Command="{Binding $parent[UserControl].DataContext.LoadMacroCommand}" CommandParameter="{Binding}" Margin="10,0,0,0" Padding="12,6"/>
+                                                <Button Grid.Column="2" Classes="footerAction danger" Content="{DynamicResource Delete}" Command="{Binding $parent[UserControl].DataContext.DeleteSavedMacroCommand}" CommandParameter="{Binding}" Margin="8,0,0,0" Padding="12,6"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <!-- Cancel button removed by request -->
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+</UserControl>

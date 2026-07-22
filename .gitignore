@@ -1,0 +1,67 @@
+# Visual Studio / .NET
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Tt]est[Rr]esults/
+coverage/
+*.trx
+*.coverage
+*.coveragexml
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Logs and temporary files
+*.log
+captures/
+t0/
+t3/
+t4/
+[Ll]ogs/
+
+# Misc
+.DS_Store
+*.tmp
+*.bak
+.vs/
+.idea/
+.vscode/
+*.dmp
+*.pcap
+*.pcapng
+*.etl
+*_capture.txt
+*_trace.txt
+*_debug.txt
+*_icue_*.txt
+
+# Local build and release artifacts
+artifacts/
+
+# Patches and Diff files
+*.patch
+*.diff
+
+# Scratch / Temp files
+scratch.*
+
+# Local secrets and signing material
+.env
+.env.*
+!.env.example
+*.pfx
+*.snk

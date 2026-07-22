@@ -1,0 +1,777 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ZeroCue.DataProbe.ViewModels"
+             xmlns:conv="using:ZeroCue.DataProbe.Converters"
+             x:Class="ZeroCue.DataProbe.Views.ControllerVectorView"
+             x:DataType="vm:MainViewModel">
+
+    <UserControl.Resources>
+        <conv:RemapBrushConverter x:Key="RemapBrushConverter"/>
+        <conv:RemapTooltipConverter x:Key="RemapTooltipConverter"/>
+        <conv:RemapContentConverter x:Key="RemapContentConverter"/>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <Style Selector="Button.remapBtn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.remapBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentSemiTransparentColor}"/>
+        </Style>
+        <Style Selector="Button.remapBtn:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentTransparentColor}"/>
+        </Style>
+
+        <Style Selector="TextBlock.mapText">
+            <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+            <Setter Property="FontSize" Value="48"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="TextBlock.mapLabel">
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+            <Setter Property="FontSize" Value="42"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontFamily" Value="Segoe UI, Inter, Arial"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Polyline.mapLine">
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Stroke" Value="{DynamicResource TextMutedColor}"/>
+            <Setter Property="StrokeThickness" Value="3"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+        </Style>
+        <Style Selector="Ellipse.mapDot">
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Fill" Value="{DynamicResource TextHeaderColor}"/>
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+        </Style>
+
+                        <Style Selector="Button.labelBtn /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.08" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.08" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.labelBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+        <Style Selector="Button.labelBtn.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ActiveMappingColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+
+        <Style Selector="Button.pathRemapBtn">
+            <Setter Property="Background" Value="{x:Null}"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Left" VerticalAlignment="Top" Background="{TemplateBinding Background}" />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.pathRemapBtn :is(Shape).btnPath">
+            <Setter Property="Fill" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.pathRemapBtn :is(Shape).btnPath">
+            <Setter Property="Fill" Value="Transparent" />
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.pathRemapBtn:pointerover :is(Shape).btnPath">
+            <Setter Property="Fill" Value="{DynamicResource AccentFillSemi}"/>
+        </Style>
+        <Style Selector="Button.pathRemapBtn.active :is(Shape).btnPath">
+            <Setter Property="Fill" Value="{DynamicResource AccentFillSemi}"/>
+        </Style>
+        <Style Selector="Button.pathRemapBtn.linkedHover :is(Shape).btnPath">
+            <Setter Property="Fill" Value="{DynamicResource AccentFillSemi}"/>
+        </Style>
+        <Style Selector="Button.pathRemapBtn:pressed :is(Shape).btnPath">
+            <Setter Property="Fill" Value="{DynamicResource AccentFillHigh}"/>
+        </Style>
+
+
+        <Style Selector="Button.dpadUp :is(Shape).btnPath">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadUp:pointerover :is(Shape).btnPath, Button.dpadUp.linkedHover :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadUp.active :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadDown :is(Shape).btnPath">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadDown:pointerover :is(Shape).btnPath, Button.dpadDown.linkedHover :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="50%,100%" EndPoint="50%,0%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadDown.active :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="50%,100%" EndPoint="50%,0%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadLeft :is(Shape).btnPath">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadLeft:pointerover :is(Shape).btnPath, Button.dpadLeft.linkedHover :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadLeft.active :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadRight :is(Shape).btnPath">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Fill" Duration="0:0:0.15" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadRight:pointerover :is(Shape).btnPath, Button.dpadRight.linkedHover :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="100%,50%" EndPoint="0%,50%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style Selector="Button.dpadRight.active :is(Shape).btnPath">
+            <Setter Property="Fill">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="100%,50%" EndPoint="0%,50%">
+                        <GradientStop Color="{DynamicResource AccentGlowStartColor}" Offset="0.1" />
+                        <GradientStop Color="{DynamicResource AccentGlowEndColor}" Offset="0.9" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+
+                        <Style Selector="Button.labelBtn, Button.circleLabelBtn">
+            <Setter Property="Background" Value="{DynamicResource InactiveMappingColor}"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="4"/>
+            <Setter Property="CornerRadius" Value="20"/>
+            <Setter Property="Width" Value="100"/>
+            <Setter Property="Height" Value="100"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.circleLabelBtn /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="Background" Duration="0:0:0.08" />
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.08" />
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.circleLabelBtn:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+        <Style Selector="Button.circleLabelBtn.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ActiveMappingColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+        <Style Selector="Button.modeSegment">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#8A94A6"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="FontSize" Value="44"/>
+            <Setter Property="CornerRadius" Value="30"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.modeSegment:pointerover">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+        </Style>
+        <Style Selector="Button.modeSegment.active">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+        <Style Selector=":is(UserControl).controllerSilhouette Button.labelBtn">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector=":is(UserControl).controllerSilhouette Button.circleLabelBtn">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector=":is(UserControl).controllerSilhouette Polyline.mapLine">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector=":is(UserControl).controllerSilhouette Ellipse.mapDot">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+        <Style Selector=":is(UserControl).controllerSilhouette Border.modeToggle">
+            <Setter Property="IsVisible" Value="False"/>
+        </Style>
+
+</UserControl.Styles>
+
+    <Grid RowDefinitions="*, Auto">
+        <Viewbox Grid.Row="0" Stretch="Uniform" Margin="0">
+            <!-- Wrap the Canvas in a Panel to crop empty space -->
+            <Panel x:Name="ControllerCropPanel" Width="3700" Height="2500" ClipToBounds="False">
+                <Canvas x:Name="ControllerOuterCanvas" Width="5400" Height="2508" Margin="-750, 40, 0, 0" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <!-- Controller SVG base shifted by 1350px to the right -->
+                <Canvas Canvas.Left="1350" Width="2508" Height="2508" Background="Transparent">
+
+                    <!-- Masking canvas to hide elements when they are behind the controller -->
+                    <Canvas Canvas.Left="0" Canvas.Top="-1000" Width="2508" Height="1510.53" ClipToBounds="True" ZIndex="2">
+                        <!-- USB Cable Animation -->
+                        <Canvas x:Name="UsbCableCanvas" Canvas.Left="1189.75" Canvas.Top="-139.5" Width="132" Height="1650">
+                            <Canvas.RenderTransform>
+                                <TranslateTransform Y="-1650" />
+                            </Canvas.RenderTransform>
+                            <Path Stroke="{DynamicResource ControllerBodyColor}"
+                                  StrokeThickness="8"
+                                  StrokeLineCap="Round"
+                                  Data="M 50 0 L 50 1508 M 82 0 L 82 1508" />
+                            <Path Stroke="{DynamicResource ControllerBodyColor}"
+                                  StrokeThickness="9"
+                                  StrokeJoin="Round"
+                                  Fill="Transparent"
+                                  Data="M 30 1608 L 30 1530 Q 30 1508 52 1508 L 80 1508 Q 102 1508 102 1530 L 102 1608 Z" />
+                            <Path Stroke="{DynamicResource ControllerBodyColor}"
+                                  StrokeThickness="8"
+                                  StrokeJoin="Round"
+                                  Fill="Transparent"
+                                  Data="M 42 1646 L 90 1646 L 90 1608 L 42 1608 Z" />
+                            <Path Stroke="{DynamicResource ControllerBodyColor}"
+                                  StrokeThickness="6"
+                                  StrokeLineCap="Round"
+                                  Data="M 50 1548 L 82 1548 M 50 1580 L 82 1580" />
+                        </Canvas>
+
+                        <!-- RF Dongle Animation -->
+                        <Viewbox x:Name="RfDongleViewbox" Width="150" Height="500" Canvas.Left="1180.75" Canvas.Top="1510.53" Opacity="0">
+                            <Viewbox.RenderTransform>
+                                <RotateTransform Angle="0" CenterX="75" CenterY="250" />
+                            </Viewbox.RenderTransform>
+                            <Canvas Width="1063" Height="3560">
+                                <Canvas.RenderTransform>
+                                    <TranslateTransform X="-1468" Y="-220" />
+                            </Canvas.RenderTransform>
+                            <Path Fill="{DynamicResource ControllerBodyColor}" Data="M 1627.93 221.125 L 2080.29 220.699 L 2249.05 220.719 C 2272.55 220.734 2355.37 218.247 2371.03 226.653 C 2375.27 249.709 2374.29 293.597 2374.35 318.266 L 2374.43 465.107 L 2373.83 981.173 C 2415.22 981.236 2479.24 963.207 2510.2 990.942 C 2524.72 1004.62 2527.31 1022.73 2527.15 1042.34 C 2526.19 1158.62 2529.52 1275.91 2525.72 1391.91 C 2525.18 1408.35 2486.99 1424.96 2492.13 1444.42 C 2497.62 1465.23 2530.15 1455.41 2531.41 1482.33 C 2532.26 1508.16 2531.84 1534.24 2531.84 1560.16 L 2531.8 1726.96 L 2531.56 2272.73 L 2530.86 3193.29 L 2530.92 3515.4 C 2530.92 3571.06 2531.22 3627.13 2530.51 3682.76 C 2530.26 3702.3 2527.93 3718.98 2514.6 3734.31 C 2482.51 3771.2 2411.98 3774.61 2366.7 3777.66 C 2326.23 3780.27 2273.84 3778.95 2232.43 3778.96 L 2003.23 3778.96 L 1782.78 3778.96 C 1708.24 3778.96 1633.78 3780.48 1559.72 3767.19 C 1525.16 3761 1476.83 3745.36 1471.43 3702.92 C 1469.28 3686.07 1470.18 3662.68 1470.09 3645.38 L 1469.97 3538.43 L 1470.08 3211.78 L 1470.03 1849.49 C 1470.05 1724.63 1468.77 1599.29 1471.62 1474.52 C 1471.99 1458.17 1533.52 1458.18 1499.14 1424.41 C 1488.66 1414.11 1469.99 1406.27 1469.3 1388.69 C 1467.89 1352.67 1468.48 1316.72 1468.52 1280.83 L 1468.36 1065.38 C 1468.39 945.706 1526.55 979.205 1615.68 981.001 L 1615.3 447.38 L 1615.26 300.008 C 1615.27 278.912 1614.78 255.192 1616.31 234.111 C 1616.66 229.198 1623.86 224.313 1627.93 221.125 z M 2496.35 3729.95 C 2507.56 3718.39 2512.79 3708.36 2513.29 3691.74 C 2514.07 3665.6 2513.41 3638.24 2513.45 3612.02 L 2513.64 3442.65 L 2513.68 2917.48 L 2514.13 1955.7 C 2514.14 1806.36 2516.4 1651.76 2514.16 1502.88 C 2514.1 1494.71 2513.62 1486.55 2512.71 1478.44 C 2509.88 1476.11 2505.87 1471.66 2501.45 1473.82 C 2477.7 1485.4 2449.5 1490.12 2423.24 1491.82 C 2369.67 1495.27 2315.09 1494.04 2261.39 1494.03 L 1994.72 1493.9 L 1740.05 1493.9 C 1678.6 1493.91 1616.32 1496.09 1555.16 1488.8 C 1530.12 1485.81 1516.16 1479.84 1493.1 1471.72 C 1489.02 1477.26 1487.8 1480.79 1487.66 1487.94 C 1486.74 1536.31 1486.91 1586.04 1486.92 1634.32 L 1486.98 1929.64 L 1487.04 3172.39 L 1487.04 3523.65 C 1487.03 3580.1 1485.13 3643 1489.69 3699.09 C 1490.87 3713.62 1494.53 3722.66 1506.99 3730.84 C 1535.22 3749.37 1580.91 3754.42 1613.92 3757.45 C 1675.32 3763.08 1738.2 3761.65 1799.81 3761.61 L 2040.22 3761.57 L 2249.08 3761.63 C 2316.85 3761.7 2441.14 3768.52 2496.35 3729.95 z M 1632.43 981.279 L 2357.95 980.946 L 2357.68 238.325 C 2117.46 238.499 1872.65 235.975 1632.76 238.5 L 1632.43 981.279 z M 2465.33 1413.32 C 2488.64 1410.41 2511.5 1405.46 2510.78 1375.33 C 2509.66 1327.61 2509.92 1280.22 2510.02 1232.51 L 2510.19 1100.12 C 2510.2 1074.78 2510.84 1050.67 2508.28 1025.85 C 2506.24 1006.2 2489.11 988.376 2469.5 990.979 C 2382.67 1002.5 2296.27 998.405 2208.63 998.38 L 1860.86 998.508 C 1752.28 998.646 1626.63 1003.32 1520.92 990.11 C 1506.02 995.474 1497.77 999.324 1490.71 1014.54 C 1487.45 1021.55 1485.47 1030.73 1485.37 1038.49 C 1484.87 1078.79 1486.33 1119 1486.05 1159.39 C 1485.55 1229.12 1485.32 1299.07 1485.8 1368.81 C 1485.85 1375.42 1488.13 1392.38 1490.79 1397.54 C 1495.1 1405.92 1513 1411.58 1521.76 1412.46 C 1582.97 1418.6 1647.61 1417.26 1708.8 1417.09 L 1999.87 1416.91 L 2302.68 1416.9 C 2342.53 1416.88 2429.14 1419.26 2465.33 1413.32 z M 1523.07 1428.89 C 1524.53 1438.87 1519.36 1463.03 1521.64 1464.86 C 1522.23 1465.34 1525 1466.4 1525.78 1466.72 C 1584.84 1479.47 1660.47 1476.33 1721.86 1476.31 L 1959.14 1476.19 L 2243.4 1476.25 C 2313.7 1476.3 2417.17 1481.87 2483.18 1464.55 C 2476.59 1451.4 2475.56 1445.26 2476.53 1430.42 L 2474.84 1428.78 C 2390.51 1437.04 2319.75 1434.38 2235.25 1434.33 L 1913.26 1434.33 L 1685.7 1434.25 C 1633.28 1434.23 1575.22 1436.3 1523.07 1428.89 z"/>
+                            <Path Fill="{DynamicResource ControllerBodyColor}" Data="M 1955.86 2494.52 C 1963.94 2493.95 1962.94 2492.8 1969.11 2495.92 C 1975.97 2508.64 1972.65 2547.96 1972.28 2565.47 C 1892.68 2578.2 1831.07 2634.33 1816.88 2714.71 C 1808.51 2761.99 1819.65 2810.65 1847.76 2849.58 C 1879.17 2893.7 1919.65 2914.53 1971.99 2923.02 C 1972.97 2946.16 1972.47 2973.37 1971.47 2996.39 C 1931.43 2991.91 1903.54 2984.51 1867.77 2964.69 C 1866.96 2964.26 1860.53 2960.8 1860.39 2960.79 C 1836.16 2959.25 1757.91 3008.59 1740.63 2993.89 C 1739.24 2983.08 1773.71 2900.63 1780.14 2883.39 C 1762.06 2851.01 1750.62 2825.95 1744.4 2788.95 C 1732.7 2721.85 1748.45 2652.85 1788.13 2597.48 C 1829.05 2540.25 1886.83 2506.18 1955.86 2494.52 z M 1798.14 2881.73 C 1785.21 2914.05 1772.67 2946.51 1760.51 2979.12 C 1792.69 2966.52 1826.6 2953.83 1858.34 2940.49 L 1883.2 2954.16 C 1911.91 2967.67 1924.82 2972.35 1956.17 2978.11 L 1956.31 2936.9 C 1903.61 2925.81 1859.84 2898.8 1830.04 2853.15 C 1800.79 2809.06 1790.83 2754.93 1802.46 2703.31 C 1813.65 2651.49 1845.34 2606.4 1890.32 2578.32 C 1913.16 2564.06 1930.72 2558.34 1956.43 2551.77 C 1956.21 2543.95 1956.47 2517.61 1953.61 2512.21 L 1948.95 2512.18 C 1882.05 2528.16 1829.55 2560.07 1792.71 2619.85 C 1759.25 2674.08 1748.89 2739.45 1763.94 2801.37 C 1771.82 2834.14 1781.47 2852.89 1798.14 2881.73 z"/>
+                            <Path Fill="{DynamicResource ControllerBodyColor}" Data="M 2017.77 2493.69 C 2044.71 2493.8 2079 2504.81 2103.4 2516.12 C 2259.58 2588.56 2297.48 2797.89 2177.63 2921.26 C 2146.28 2953.53 2117.28 2969.84 2074.72 2985.39 C 2054.96 2991.65 2038.69 2994.36 2018.19 2996.49 C 2016.65 2977.15 2017.58 2942.98 2018.11 2923.28 C 2046.21 2917.54 2065.87 2912.25 2090.68 2897.09 C 2174.83 2845.76 2199.99 2734.14 2148.12 2650.73 C 2115.34 2598.01 2076.19 2578.87 2017.57 2565.38 C 2017.18 2541.48 2017.25 2517.58 2017.77 2493.69 z M 2033.1 2552.21 C 2090.53 2567.52 2132.75 2591.64 2163.62 2644.74 C 2190.8 2691.53 2197.88 2747.32 2183.25 2799.41 C 2169.55 2848.9 2136.49 2890.78 2091.54 2915.6 C 2072.41 2926.13 2054.9 2931.67 2033.56 2935.5 C 2033.8 2949.64 2033.79 2964.72 2034.4 2978.77 L 2067.4 2970.58 C 2132.93 2946.94 2180.15 2908.55 2209.93 2844.42 C 2236.65 2787.39 2239.24 2722 2217.11 2663.04 C 2195.03 2603.36 2149.98 2555 2092 2528.75 C 2072.32 2519.91 2055.06 2515.73 2034.18 2510.85 L 2033.1 2552.21 z"/>
+                            <Path Fill="{DynamicResource ControllerBodyColor}" Data="M 1983.57 2621.78 C 2029.84 2616.22 2093.13 2641.64 2086.75 2696.65 C 2078.34 2701.74 2026.02 2702.11 2018.48 2697.67 C 2015.08 2690.73 2011.39 2681.07 2003.52 2679 C 1992.4 2676.07 1978.48 2678.86 1975.43 2691.02 C 1983.9 2715.88 2054.84 2713.64 2076.59 2738.58 C 2116.26 2784.07 2093.33 2849.72 2035.66 2864.12 C 2018.75 2868.34 2006.84 2869.1 1989.59 2869.37 C 1962.38 2867.63 1937.02 2862.18 1916.45 2842.41 C 1903.89 2830.34 1888.09 2798.83 1896.55 2782.4 C 1906.57 2776.46 1951.54 2780.26 1966.59 2780.41 C 1973.76 2824.62 2015.76 2814.87 2019.95 2793.08 C 2018.58 2788.63 2017.57 2784.21 2012.47 2781.87 C 1985.47 2769.49 1953.77 2768.51 1928.71 2751.24 C 1896.19 2728.63 1890.07 2686.62 1914.56 2655.47 C 1933.02 2631.99 1955.27 2624.83 1983.57 2621.78 z M 1952.79 2795.76 C 1938.44 2796.02 1923.5 2796.48 1909.2 2796.24 C 1924.84 2842.08 1946.15 2847.97 1991.22 2853.67 C 2014.9 2852.47 2052.76 2846.93 2065.55 2828.49 C 2104.76 2771.17 2065.86 2739.44 2010.11 2727.44 C 1994.75 2724.14 1958.89 2712.46 1959.32 2694.63 C 1960.27 2654.87 2012.14 2649.82 2031.03 2684.77 L 2072.03 2683.96 C 2063.19 2662.62 2057.51 2653.8 2034.3 2643.45 C 2023.1 2638.45 1997.35 2635.53 1985.48 2637.41 C 1945.89 2642.52 1912.42 2659.74 1916.53 2706.65 C 1921.43 2762.47 2023.78 2746.34 2036.28 2788.68 C 2046.41 2822.97 1989.79 2838.37 1967.5 2818.1 C 1960.07 2812.37 1956.37 2803.76 1952.79 2795.76 z"/>
+                            <Path Fill="{DynamicResource ControllerBodyColor}" Data="M 1986.22 2014.42 C 2003.37 2009.81 2021.02 2019.97 2025.65 2037.11 C 2030.29 2054.26 2020.16 2071.92 2003.02 2076.59 C 1985.84 2081.26 1968.13 2071.1 1963.49 2053.92 C 1958.84 2036.73 1969.03 2019.04 1986.22 2014.42 z M 1999.03 2061.25 C 2007.55 2058.88 2012.59 2050.11 2010.34 2041.56 C 2008.08 2033.01 1999.37 2027.85 1990.79 2030 C 1985.14 2031.41 1980.69 2035.75 1979.14 2041.36 C 1977.58 2046.97 1979.17 2052.99 1983.29 2057.1 C 1987.4 2061.22 1993.42 2062.8 1999.03 2061.25 z"/>
+                            <Path Fill="{DynamicResource ControllerBodyColor}" Data="M 2093.62 451.275 C 2139.3 449.868 2193.68 450.659 2239.7 451.334 C 2240.77 469.934 2241.12 554.21 2238.63 568.252 C 2190.15 568.968 2141.66 568.953 2093.18 568.208 C 2091.77 552.764 2091.03 465.721 2093.62 451.275 z M 2109.36 468.739 C 2109.1 496.271 2109 523.805 2109.06 551.338 L 2179.2 551.42 L 2222.79 550.843 L 2223.04 468.563 C 2198.5 467.983 2173.95 467.713 2149.41 467.755 L 2109.36 468.739 z"/>
+                            <Path Fill="{DynamicResource ControllerBodyColor}" Data="M 1759.45 451.456 C 1805.27 449.729 1858.47 451.036 1904.79 451.04 C 1905.84 472.737 1907.29 550.584 1903.89 568.109 C 1856.57 569.401 1805.7 568.572 1758.25 568.405 C 1758 548.22 1755.94 465.808 1759.45 451.456 z M 1775.37 468.319 C 1775.31 495.068 1775.89 524.794 1774.97 551.296 L 1862.79 551.33 L 1888.65 550.754 L 1888.63 467.772 C 1860.51 467.745 1831.78 467.395 1803.72 467.747 L 1775.37 468.319 z"/>
+                        </Canvas>
+                    </Viewbox>
+                    </Canvas>
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1716.49 450.805 C 1720.97 422.972 1733.14 418.018 1744.85 394.169 C 1756.43 370.686 1759.55 342.145 1776.73 321.453 C 1823.54 265.05 1910.07 285.159 1959.81 326.691 C 2004.88 364.315 2036.76 413.516 2062.12 465.907 C 2065.24 472.367 2065.14 485.114 2068.11 492.068 C 2078.27 514.251 2079.82 520.377 2082.57 544.097 C 2093.3 548.658 2103.07 554.127 2111.02 562.87 C 2127.65 581.158 2158.44 652.302 2170.83 678.674 C 2192.61 685.314 2231.14 695.634 2239.4 718.497 C 2248.94 744.868 2257.43 771.98 2266.07 798.705 C 2281.65 847.355 2296.17 896.338 2309.61 945.619 C 2315.41 966.641 2321.27 987.806 2326.86 1008.88 C 2329.83 1020.1 2329.33 1039.61 2332.38 1049.81 C 2339.75 1074.42 2347.69 1099.09 2355.04 1123.74 C 2368.23 1168.4 2380.47 1213.33 2391.74 1258.52 C 2441.79 1460.68 2520.46 1885.39 2443.87 2074.89 C 2421.84 2129.41 2383.93 2179.02 2328.5 2202.27 C 2283.58 2221.11 2233.71 2223.82 2188.3 2205.23 C 2077.23 2159.76 1973.36 1946.59 1928.75 1840.16 C 1920.21 1819.8 1912.12 1799.25 1904.47 1778.54 C 1892.86 1747.31 1885.53 1713.25 1851.9 1699.41 C 1823.43 1687.7 1778.96 1691.59 1748.1 1691.59 L 1622.35 1691.61 L 1241.63 1691.63 L 869.085 1691.59 L 745.26 1691.59 C 724.203 1691.6 698.917 1690.97 678.171 1691.92 C 668.293 1692.37 658.557 1694.44 649.354 1698.06 C 637.19 1702.79 621.634 1712.97 614.983 1723.94 C 602.286 1744.88 593.63 1774.74 584.02 1798.14 C 574.981 1820.16 566.119 1841.31 556.538 1862.9 C 514.392 1957.89 431.64 2116.73 349.283 2181 C 335.292 2191.96 319.683 2200.68 303.015 2206.84 C 257.23 2224.29 205.484 2219.45 161.41 2199.14 C 105.67 2173.46 68.5475 2121.84 47.6531 2065.5 C -23.716 1873.07 55.3133 1456.79 106.767 1254.5 C 117.757 1211.39 129.763 1168.54 142.775 1126 C 150.427 1101.11 158.642 1076.09 166.25 1051.23 C 169.332 1038.03 168.179 1024.22 171.682 1011.04 C 198.092 911.762 226.866 812.696 262.275 716.246 C 268.86 698.307 291.622 691.907 307.901 686.376 C 315.689 683.73 323.49 681.073 331.285 678.444 C 348.562 643.327 368.734 595.055 390.865 562.95 C 396.283 555.091 410.278 547.739 419.369 544.338 C 421.741 519.362 423.427 515.38 433.286 492.364 C 436.134 485.249 436.292 471.963 439.587 465.459 C 480.832 384.036 541.271 292.83 641.093 287.078 C 719.469 280.829 737.08 338.958 758.099 397.124 C 766.158 419.423 779.923 419.427 785.523 450.977 C 796.528 460.145 804.802 472.096 813.933 483.136 C 842.346 517.485 886.475 510.534 927.439 510.539 L 1027.36 510.523 L 1337.86 510.538 L 1541.36 510.548 C 1573.26 510.54 1619.48 512.227 1649.91 507.565 C 1679.38 503.05 1696.88 467.767 1715.15 451.95 L 1716.49 450.805 z M 877.704 516.714 C 837.385 516.955 822.038 508.238 784.397 499.223 C 767.469 495.168 734.592 494.922 716.467 496.48 C 637.616 502.322 560.337 515.323 483.3 533.217 C 460.356 538.547 425.454 544.578 405.489 556.664 C 387.873 567.327 373.323 603.203 364.004 622.096 C 344.711 661.21 326.589 701.528 307.78 741.032 C 275.228 808.83 244.173 877.337 214.635 946.501 C 199.321 982.485 183.69 1018.72 170.648 1055.6 C 152.764 1106.17 137.917 1158.54 123.89 1210.31 C 65.3869 1426.19 7.00933 1738.4 29.7027 1959.41 C 37.834 2038.6 63.0259 2120.12 127.164 2171.98 C 164.195 2201.93 214.876 2216.61 262.165 2211.46 C 324.573 2204.68 367.679 2162.79 404.972 2116.04 C 470.587 2033.78 520.646 1934.38 561.893 1838 C 570.638 1817.47 579.064 1796.81 587.168 1776.03 C 600.608 1741.49 606.707 1709.41 645.37 1694.42 C 674.069 1683.3 703.941 1686.54 734.518 1686.53 L 848.117 1686.57 L 1213.02 1686.58 L 1625.73 1686.53 L 1755.75 1686.52 C 1774.58 1686.52 1807.33 1685.65 1825.04 1687.26 C 1842.65 1688.99 1859.36 1695.86 1873.1 1707.02 C 1892.91 1723.38 1895.53 1739.98 1904.04 1762.86 C 1923.88 1816.19 1945.53 1871.35 1970.87 1922.36 C 2011.14 2001.33 2083.17 2128.96 2155.8 2181.61 C 2169.91 2191.64 2185.44 2199.51 2201.87 2204.97 C 2246.53 2219.66 2298.19 2212.91 2339.53 2191.47 C 2394.71 2162.86 2430.29 2105.79 2448.17 2047.87 C 2518.96 1818.45 2408.31 1286.81 2327.97 1054.63 C 2297.44 966.389 2254.49 875.246 2215.65 789.908 C 2184.29 721.026 2154.29 650.835 2118.98 583.873 C 2109.06 565.051 2096.29 553.675 2075.89 547.342 C 2055.64 541.055 2034.35 536.862 2013.65 532.168 C 1946.71 516.488 1878.81 505.27 1810.38 498.587 C 1790.2 496.819 1759.81 494.521 1739.89 496.143 C 1692.99 499.962 1673.97 517.681 1624.11 516.464 C 1610.48 600.916 1596.27 685.276 1581.5 769.537 L 1571.04 831.335 C 1566.08 861.008 1564.78 891.971 1538.43 909.676 C 1530.01 915.334 1518.7 920.32 1508.21 921.196 C 1475.98 922.691 1442.05 922.131 1409.75 922.142 L 1218.58 922.162 L 1067.11 922.123 C 1042.18 922.111 1012.64 923.061 988.16 920.359 C 973.374 918.726 955.138 906.08 946.64 893.344 C 942.608 887.232 939.609 880.498 937.764 873.412 C 934.902 862.736 932.177 843.696 930.211 832.238 L 916.576 751.086 C 903.157 673.039 890.199 594.914 877.704 516.714 z M 1619.19 515.637 L 882.386 515.532 L 926.91 781.523 L 937.007 841.468 C 941.399 867.581 942.517 889.203 966.211 906.025 C 974.363 911.809 983.932 915.269 993.898 916.037 C 1016.54 917.916 1062.91 916.524 1087.35 916.491 L 1263.78 916.464 L 1421.9 916.496 C 1453.15 916.542 1488.02 918.799 1518.49 913.885 C 1545.09 909.594 1557.66 880.89 1561.25 857.51 L 1603.17 612.427 C 1608.53 580.936 1613.37 546.691 1619.19 515.637 z M 561.811 422.621 C 629.567 408.437 705.419 404.042 771.749 426.689 C 727.996 374.219 741.817 286.199 641.122 291.923 C 545.443 299.657 489.392 380.872 448.283 459.131 C 484.049 443.947 523.523 429.952 561.811 422.621 z M 2173 684.941 C 2214.06 772.702 2253.76 861.087 2292.11 950.066 C 2295.84 958.884 2321.72 1024.44 2324.03 1026.51 C 2323.35 1008.93 2306.1 951.115 2300.77 932.295 C 2287.56 884.627 2273.33 837.247 2258.08 790.19 C 2251.88 770.737 2238.81 722.432 2226.08 707.458 C 2220.66 701.076 2183.02 687.696 2173 684.941 z M 1724.17 434.106 L 1721.85 447.691 C 1786.17 408.797 1923.22 431.288 1992.14 455.219 C 2016.01 464.134 2042.55 472.369 2061.95 489.174 C 2060.58 481.662 2059.25 473.453 2057.67 466.045 C 2043.03 460.47 2028.77 454.099 2014.06 448.907 C 1947.55 425.429 1878.38 412.666 1807.73 416.891 C 1774.47 419.696 1755.96 422.957 1724.17 434.106 z M 591.792 506.384 C 647.512 497.25 719.591 486.333 776.197 492.569 C 792.64 494.38 819.425 503.793 837.064 507.578 C 808.908 491.324 809.552 484.237 789.593 461.985 C 761.308 430.452 685.148 430.723 645.276 432.823 C 591.135 437.648 478.967 457.431 437.904 498.181 C 428.203 507.809 426.511 528.741 424.396 542.491 C 475.227 529.125 539.691 514.511 591.792 506.384 z M 1957.24 514.911 C 1995.89 522.883 2039.57 531.827 2077.51 542.592 C 2073.41 517.049 2074.48 503.81 2051.06 486.904 C 2037.52 477.133 2018.85 470.157 2002.99 464.428 C 1938.72 440.489 1870.29 429.738 1801.77 432.818 C 1768.88 435.648 1729.85 439.092 1708.62 466.423 C 1693.72 485.601 1686.33 494.856 1665.73 507.444 C 1681.6 503.249 1713.85 493.294 1728.13 492.163 C 1799.13 486.538 1888.18 501.804 1957.24 514.911 z M 439.786 488.245 C 474.374 463.5 514.278 453.346 554.712 442.069 C 619.922 427.727 719.525 413.948 779.719 446.94 C 779.069 443.546 778.08 435.167 775.419 433.969 C 736.902 416.643 679.491 415.09 639.86 416.891 C 558.58 423.667 518.563 436.829 444.285 466.048 C 442.789 473.368 441.135 480.923 439.786 488.245 z M 325.81 685.874 C 306.544 692.132 275.347 698.905 267.513 717.285 C 258.701 737.96 251.39 762.057 244.315 783.568 C 223.801 845.047 205.12 907.122 188.298 969.712 C 185.263 980.984 176.113 1012.49 175.233 1022.05 L 176.154 1023.41 L 177.271 1023.27 C 187.755 994.715 201.416 963.739 213.503 935.745 C 236.089 883.229 259.602 831.116 284.031 779.432 L 315.405 713.04 C 318.167 707.224 326.595 691.318 327.829 686.469 C 325.946 685.799 326.459 685.849 325.81 685.874 z M 2054 459.735 C 2016.84 394.445 1971.71 318.709 1893.48 297.153 C 1879.37 293.392 1864.8 291.654 1850.21 291.991 C 1823 294.122 1801.84 300.507 1783.13 321.956 C 1766.59 340.924 1762.64 363.958 1753.63 386.507 C 1747.82 400.922 1739.99 414.439 1730.38 426.653 C 1796.86 404.016 1885.45 407.841 1953.33 425.721 C 1979.29 431.075 2030.25 447.636 2054 459.735 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 510.115 718.074 C 623.228 706.36 724.362 788.707 735.813 901.847 C 747.265 1014.99 664.683 1115.93 551.517 1127.12 C 438.721 1138.27 338.183 1056.02 326.769 943.249 C 315.355 830.48 397.373 729.75 510.115 718.074 z M 549.086 1122.11 C 659.257 1112.29 740.629 1015.05 730.871 904.872 C 721.112 794.696 623.914 713.273 513.733 722.974 C 403.47 732.682 321.972 829.967 331.739 940.226 C 341.505 1050.48 438.833 1131.93 549.086 1122.11 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 528.67 740.199 C 540.563 738.245 581.082 744.187 591.313 752.871 C 598.786 759.215 596.807 787.96 596.748 798.354 L 596.678 850.018 C 615.631 850.326 634.835 849.778 653.671 850 C 664.425 850.617 689.929 846.667 696.065 858.529 C 712.057 889.445 709.721 937.938 700.78 970.946 C 698.345 979.934 694.574 983.533 687.767 988.259 C 657.389 988.026 627.01 988.103 596.633 988.491 C 596.528 1008.74 596.552 1028.99 596.704 1049.25 C 596.822 1073.37 601.738 1095.98 570.623 1100.18 C 558.35 1101.84 547.744 1103.08 535.179 1103.52 C 518.595 1103.47 505.194 1102.52 489.121 1099.31 C 459.157 1093.31 465.439 1071.67 465.736 1048.54 C 466.015 1028.48 466.042 1008.41 465.819 988.35 C 450.655 988.008 376.634 991.258 368.598 984.585 C 356.338 974.406 354.734 947.221 353.907 932.389 C 352.768 911.967 352.799 871.773 367.671 855.972 C 370.552 852.91 373.972 851.714 378.036 851.004 C 396.904 847.709 445.165 850.128 466.774 850.021 L 466.938 788.338 C 466.926 781.776 465.833 766.108 467.089 760.425 C 471.199 741.822 515.73 740.886 528.67 740.199 z M 545.107 1097.63 C 557.461 1096.8 578.811 1096.17 587.498 1086.21 C 598.5 1073.6 585.601 998.591 592.584 987.661 C 594.744 984.28 599.684 983.275 603.342 982.842 C 625.934 980.169 665.453 987.135 684.856 982.174 C 687.815 981.418 689.82 980.068 691.677 977.664 C 706.088 959.015 702.821 902.158 698.459 880.009 C 697.119 873.206 694.853 862.129 688.98 857.844 C 673.809 846.777 595.858 866.234 591.958 847.907 C 588.186 830.189 591.152 800.759 591.302 781.832 C 591.353 775.394 592.183 768.139 590.732 761.84 C 590.062 758.934 588.702 757.113 586.293 755.442 C 573.336 746.452 531.446 743.26 516.402 746.312 C 504.388 747.434 483.33 747.94 475.286 758.232 C 465.991 770.126 477.325 835.683 471.299 849.476 C 469.659 853.231 465.299 854.655 461.548 855.227 C 444.151 857.881 379.163 849.539 370.461 860.547 C 356.327 878.428 357.848 934.828 361.708 956.48 C 363.279 965.289 365.77 975.983 373.788 981.179 C 382.599 986.889 454.935 979.127 464.029 983.431 C 468.066 985.342 469.865 988.681 470.873 992.818 C 475.463 1011.67 463.908 1080.16 476.595 1089.03 C 491.063 1099.15 527.819 1098.68 545.107 1097.63 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 840.39 1100.84 C 932.449 1092.91 1013.5 1161.13 1021.4 1253.19 C 1029.3 1345.25 961.053 1426.28 868.988 1434.14 C 776.973 1442 696.001 1373.8 688.106 1281.79 C 680.211 1189.77 748.381 1108.78 840.39 1100.84 z M 865.013 1429.25 C 954.42 1423.54 1022.24 1346.38 1016.42 1256.98 C 1010.6 1167.58 933.351 1099.86 843.96 1105.79 C 754.726 1111.71 687.152 1188.79 692.96 1278.03 C 698.769 1367.27 775.765 1434.94 865.013 1429.25 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 852.553 1128.81 C 928.934 1127.51 991.946 1188.3 993.388 1264.68 C 994.83 1341.06 934.157 1404.18 857.781 1405.77 C 781.205 1407.35 717.88 1346.49 716.434 1269.91 C 714.988 1193.33 775.971 1130.12 852.553 1128.81 z M 869.792 1399.72 C 943.013 1391.47 995.65 1325.37 987.31 1252.16 C 978.97 1178.95 912.818 1126.39 839.615 1134.81 C 766.53 1143.22 714.07 1209.24 722.397 1282.34 C 730.723 1355.43 796.687 1407.97 869.792 1399.72 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1619.53 1101.15 C 1711.44 1092.98 1792.54 1160.92 1800.6 1252.84 C 1808.65 1344.76 1740.6 1425.77 1648.67 1433.71 C 1556.92 1441.62 1476.09 1373.73 1468.05 1281.98 C 1460.01 1190.24 1527.8 1109.32 1619.53 1101.15 z M 1643.86 1428.88 C 1733.14 1423.57 1801.16 1346.81 1795.68 1257.54 C 1790.21 1168.27 1713.31 1100.4 1624.06 1106.05 C 1535.04 1111.68 1467.39 1188.32 1472.85 1277.35 C 1478.32 1366.37 1554.83 1434.17 1643.86 1428.88 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1629.34 1129.08 C 1705.48 1126.3 1769.51 1185.65 1772.52 1261.78 C 1775.52 1337.91 1716.35 1402.12 1640.23 1405.34 C 1563.8 1408.58 1499.27 1349.12 1496.25 1272.67 C 1493.24 1196.23 1552.89 1131.87 1629.34 1129.08 z M 1651.04 1399.25 C 1723.9 1390.08 1775.56 1323.61 1766.46 1250.73 C 1757.35 1177.86 1690.93 1126.14 1618.04 1135.18 C 1545.07 1144.23 1493.27 1210.76 1502.39 1283.73 C 1511.5 1356.69 1578.08 1408.43 1651.04 1399.25 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1952.36 996.053 C 1996.53 992.261 2035.41 1025 2039.19 1069.18 C 2042.97 1113.35 2010.22 1152.22 1966.04 1155.99 C 1921.89 1159.76 1883.03 1127.02 1879.26 1082.86 C 1875.48 1038.71 1908.2 999.844 1952.36 996.053 z M 1963.61 1150.91 C 2004.83 1148.51 2036.38 1113.27 2034.23 1072.03 C 2032.07 1030.8 1997.02 999.041 1955.77 1000.96 C 1914.18 1002.89 1882.1 1038.3 1884.28 1079.88 C 1886.45 1121.45 1922.04 1153.32 1963.61 1150.91 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 2105.72 835.628 C 2149.37 828.355 2190.66 857.776 2198.05 901.402 C 2205.43 945.028 2176.11 986.401 2132.51 993.894 C 2088.74 1001.41 2047.19 971.97 2039.78 928.187 C 2032.37 884.405 2061.92 842.927 2105.72 835.628 z M 2122.8 989.748 C 2164 987.588 2195.75 952.598 2193.9 911.384 C 2192.05 870.17 2157.3 838.165 2116.07 839.704 C 2074.4 841.259 2041.98 876.462 2043.85 918.118 C 2045.72 959.774 2081.16 991.932 2122.8 989.748 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1796.83 834.22 C 1840.63 831.539 1878.33 864.83 1881.09 908.626 C 1883.86 952.423 1850.63 990.184 1806.84 993.024 C 1762.94 995.872 1725.06 962.545 1722.29 918.636 C 1719.52 874.727 1752.92 836.907 1796.83 834.22 z M 1806.85 987.726 C 1847.71 984.877 1878.58 949.524 1875.89 908.65 C 1873.2 867.777 1837.97 836.771 1797.09 839.297 C 1755.98 841.837 1724.76 877.309 1727.46 918.412 C 1730.17 959.515 1765.76 990.592 1806.85 987.726 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1957.41 672.275 C 2000.84 671.008 2037.1 705.121 2038.48 748.543 C 2039.87 791.964 2005.85 828.316 1962.43 829.816 C 1918.85 831.321 1882.33 797.148 1880.94 753.561 C 1879.55 709.975 1913.82 673.546 1957.41 672.275 z M 1972.22 823.494 C 2012.26 816.621 2039.17 778.625 2032.36 738.575 C 2025.56 698.525 1987.61 671.548 1947.55 678.284 C 1907.39 685.037 1880.33 723.099 1887.16 763.245 C 1893.98 803.392 1932.08 830.383 1972.22 823.494 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1236.26 1195.78 C 1275.21 1190.53 1310.99 1217.96 1316.04 1256.93 C 1321.09 1295.91 1293.47 1331.56 1254.47 1336.4 C 1215.76 1341.21 1180.43 1313.84 1175.42 1275.15 C 1170.41 1236.46 1197.59 1200.99 1236.26 1195.78 z M 1255.67 1330.98 C 1291.23 1325.56 1315.84 1292.57 1310.9 1256.94 C 1305.96 1221.31 1273.3 1196.26 1237.61 1200.72 C 1214.08 1203.66 1193.96 1219.03 1184.94 1240.95 C 1175.92 1262.87 1179.4 1287.95 1194.04 1306.59 C 1208.69 1325.24 1232.23 1334.55 1255.67 1330.98 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 768.26 643.237 C 798.6 642.487 810.59 659.924 815.814 686.797 C 823.227 724.938 861.809 790.757 801.108 803.343 C 759.716 805.047 758.213 777.409 748.7 745.657 C 744.449 730.824 740.317 715.827 736.25 700.959 C 728.489 672.587 738.758 650.219 768.26 643.237 z M 800.049 798.77 C 834.396 788.937 833.378 766.767 824.7 737.701 C 818.669 717.497 813.526 696.54 807.44 676.31 C 802.227 657.631 790.433 648.008 770.581 648.207 C 759.263 650.081 751.87 653.895 744.992 663.32 C 737.719 673.296 738.003 685.049 740.759 696.55 C 745.287 715.446 751.242 734.23 756.302 752.953 C 763.603 779.972 767.391 798.389 800.049 798.77 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="0.964706" Data="M 766.292 659.306 C 780.12 657.776 792.356 660.797 797.363 675.327 C 804.271 695.371 809.623 716.359 815.273 736.825 C 821.162 758.155 828.036 777.364 802.701 787.79 C 779.986 792.495 771.749 777.357 767.001 758.631 C 761.263 735.994 753.034 713.605 748.709 690.578 C 745.701 674.561 752.053 665.533 766.292 659.306 z M 800.038 784.392 C 805.267 782.041 815.971 776.084 816.173 769.695 C 816.945 745.311 803.2 713.641 797.925 690.247 C 793.838 672.115 787.827 661.827 769.195 662.644 C 760.298 666.63 749.585 673.922 751.994 685.71 C 757.874 714.47 766.282 744.296 776.068 771.965 C 779.901 782.801 790 784.296 800.038 784.392 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1712.2 643.257 C 1784.82 643.091 1745.59 725.388 1737.24 763.046 C 1731.95 786.932 1725.46 797.965 1701.37 803.281 C 1640.17 804.763 1655.47 748.43 1668.27 710.851 C 1678.44 681.004 1673.17 650.941 1712.2 643.257 z M 1698.34 798.978 C 1729.12 790.691 1729.93 773.75 1736.63 744.856 C 1742.59 719.137 1766.11 670.438 1734.67 653.152 C 1728.78 649.883 1722.16 648.147 1715.42 648.101 C 1695.2 651.18 1683.35 662.599 1680.55 682.573 C 1675.25 720.341 1632.09 794.694 1698.34 798.978 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="0.964706" Data="M 1709.31 659.076 C 1753.25 655.147 1742.69 696.53 1733.46 723.021 C 1728.19 738.123 1725.8 754.548 1720.65 769.704 C 1717 780.43 1711.76 783.658 1701.96 788.022 C 1653.07 793.557 1673.89 739.702 1681.92 714.108 C 1688.81 692.148 1686.4 669.495 1709.31 659.076 z M 1702.16 783.535 C 1712.94 777.716 1715.32 774.577 1718.66 762.543 C 1723.58 744.84 1727.26 725.744 1733.32 708.434 C 1741.12 686.137 1742.38 660.942 1710.98 662.751 C 1700.12 668.37 1698.51 669.561 1694.99 681.366 C 1688.74 702.332 1683.35 723.446 1677.61 744.578 C 1673.72 758.912 1669.22 775.557 1686.83 782.453 C 1692.43 784.644 1696.29 784.358 1702.16 783.535 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 737.208 1600.86 L 813.114 1600.54 C 827.528 1600.49 841.018 1600.36 855.922 1601.01 C 881.213 1602.11 892.75 1628.02 880.09 1648.77 C 875.914 1655.62 867.991 1659.63 860.068 1661.19 C 842.849 1662.19 739.504 1663.75 727.528 1658.38 C 720.145 1655.07 714.751 1647.89 712.357 1640.31 C 709.759 1632.08 710.657 1623.57 714.949 1616.09 C 719.911 1607.43 727.869 1603.3 737.208 1600.86 z M 863.623 1655.41 C 893.758 1639.56 884.216 1602.62 840.288 1606.16 C 807.412 1608.81 767.321 1603.92 733.146 1606.84 C 703.023 1623.15 719.408 1655.33 735.028 1655.27 C 768.854 1655.16 832.465 1658.83 863.623 1655.41 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1636.31 1600.86 C 1655.58 1600.77 1755.62 1598.2 1766.99 1603.63 C 1774.61 1607.26 1780.38 1613.89 1782.93 1621.93 C 1788.79 1640 1778.06 1655.35 1760.83 1660.92 C 1740.9 1662.34 1639.67 1663.99 1627.53 1658.26 C 1620.69 1655.03 1615.61 1648.45 1613.04 1641.46 C 1610.05 1633.3 1610.62 1624.89 1614.55 1617.12 C 1619.16 1608.03 1626.89 1603.73 1636.31 1600.86 z M 1763.42 1655.06 C 1778.39 1645.91 1784.47 1632.06 1774.54 1616.3 C 1771.88 1612.07 1766.27 1607.62 1760.97 1607.27 C 1726.38 1604.99 1691.29 1606.71 1656.59 1606.21 C 1648.85 1606.1 1639.9 1606.13 1632.3 1606.96 C 1625.44 1611.04 1619.55 1615.36 1617.43 1623.45 C 1615.56 1630.62 1616.26 1638.27 1620.09 1644.67 C 1623.08 1649.67 1627.47 1653.3 1633.16 1654.68 C 1643.96 1657.31 1749.94 1657.41 1763.42 1655.06 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1189.04 1428.36 C 1204.01 1427.46 1224.61 1427.6 1240.26 1428.19 C 1272.75 1429.4 1336.26 1414.95 1325.59 1468.89 C 1322.86 1482.66 1315.9 1489.15 1302.66 1492.58 C 1282.74 1492.94 1194.84 1495.59 1182.04 1489.94 C 1175 1486.83 1169.95 1480.36 1167.47 1473.22 C 1164.3 1464.05 1164.38 1451.83 1169.09 1443.18 C 1173.55 1434.98 1180.45 1431.07 1189.04 1428.36 z M 1297.16 1487.35 C 1333.8 1485.38 1324.68 1434.01 1301.16 1433.74 C 1267.29 1433.36 1230.1 1432.53 1196.27 1433.41 C 1161.72 1435.29 1163.02 1479.92 1189.4 1486.66 C 1196.82 1488.55 1221.58 1487.58 1230.73 1487.5 C 1252.87 1487.3 1275.02 1487.25 1297.16 1487.35 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 967.364 1600.91 C 996.959 1600.16 1027.37 1600.98 1057.04 1600.49 C 1068.72 1600.3 1086.8 1599.36 1096.69 1605.29 C 1103.86 1609.65 1108.88 1616.8 1110.54 1625.03 C 1114.4 1643.63 1102.35 1657.87 1084.29 1661.07 C 1066.2 1662.62 967.564 1663.78 956.185 1657.76 C 949.383 1654.17 944.485 1647.48 942.179 1640.23 C 939.493 1631.79 940.682 1623.67 945.051 1616.01 C 950.153 1607.07 957.764 1603.4 967.364 1600.91 z M 1032.65 1655.86 C 1051.7 1656.22 1085.36 1660.44 1099.98 1648.04 C 1111.8 1638.01 1105.2 1609.86 1089.47 1607.53 C 1068.12 1604.37 1044.71 1606.92 1022.87 1606.05 C 999.505 1606.6 947.806 1596.62 946.12 1629.96 C 944.244 1667.05 1006.39 1655.84 1032.65 1655.86 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1411.82 1600.79 L 1488.11 1600.54 C 1501.33 1600.5 1531.6 1598.22 1542.05 1605.94 C 1564.23 1622.34 1558.25 1656.64 1528.7 1661.1 C 1508.57 1661.46 1414.16 1664.68 1400.68 1657.61 C 1393.93 1654.07 1389.05 1647.48 1386.92 1640.24 C 1384.54 1632.14 1385.28 1622.91 1389.58 1615.56 C 1394.54 1607.08 1402.73 1603.32 1411.82 1600.79 z M 1534.28 1655.06 C 1561.05 1639.62 1549.56 1607.36 1531.33 1607.18 C 1492.95 1606.8 1444.84 1603.58 1406.9 1606.86 C 1385.32 1619.68 1384.37 1648.85 1409 1655.16 C 1426.05 1659.54 1457.78 1653.97 1475.73 1656.16 C 1490.52 1655.99 1521.23 1657.14 1534.28 1655.06 z" />
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1190.49 1600.83 C 1210.8 1600.75 1302.91 1596.72 1316.95 1604.91 C 1324.16 1609.17 1329.26 1616.25 1331.03 1624.43 C 1332.87 1632.83 1331.19 1641.61 1326.37 1648.73 C 1321.18 1656.3 1314.34 1659.61 1305.61 1661.21 C 1286.16 1662.62 1191.62 1663.9 1179.68 1657.63 C 1172.86 1654.05 1167.85 1647.6 1165.57 1640.29 C 1163.09 1632.23 1163.99 1623.5 1168.07 1616.12 C 1173.14 1606.91 1181.01 1603.59 1190.49 1600.83 z M 1310.15 1655.22 C 1338.18 1640.66 1324.51 1608 1310.43 1607.63 C 1272.9 1606.65 1222.84 1603.52 1185.73 1606.86 C 1178.2 1611.36 1172.02 1615.62 1170.01 1624.83 C 1168.44 1631.96 1169.81 1639.43 1173.81 1645.53 C 1176.79 1649.98 1182.95 1654.95 1187.98 1655.07 C 1216.32 1655.75 1284.72 1658.63 1310.15 1655.22 z" />
+<!-- EXACT PATH HOVER OVERLAYS -->
+
+        <!-- JOYSTICK DOTS -->
+        <Ellipse Classes="stickTelemetryDot" Width="100" Height="100" Fill="{DynamicResource AccentColor}" Opacity="{Binding LeftStickOpacity}" IsHitTestVisible="False" Canvas.Left="{Binding LeftStickKnobX}" Canvas.Top="{Binding LeftStickKnobY}">
+            <Ellipse.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="LinearEasing" />
+                </Transitions>
+            </Ellipse.Transitions>
+        </Ellipse>
+        <Ellipse Classes="stickTelemetryDot" Width="100" Height="100" Fill="{DynamicResource AccentColor}" Opacity="{Binding RightStickOpacity}" IsHitTestVisible="False" Canvas.Left="{Binding RightStickKnobX}" Canvas.Top="{Binding RightStickKnobY}">
+            <Ellipse.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="LinearEasing" />
+                </Transitions>
+            </Ellipse.Transitions>
+        </Ellipse>
+
+<Button Classes="pathRemapBtn ltBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LT" Canvas.Left="448.283" Canvas.Top="286.199">
+    <Panel>
+        <Path Classes="btnPath" Data="M 113.528 136.422 C 181.284 122.238 257.136 117.843 323.466 140.49 C 279.713 88.02 293.534 0 192.839 5.724 C 97.16 13.458 41.109 94.673 0 172.932 C 35.766 157.748 75.24 143.753 113.528 136.422 z" />
+        <Path Fill="{DynamicResource AccentColor}" Opacity="{Binding LeftTriggerFill}" IsHitTestVisible="False" Data="M 113.528 136.422 C 181.284 122.238 257.136 117.843 323.466 140.49 C 279.713 88.02 293.534 0 192.839 5.724 C 97.16 13.458 41.109 94.673 0 172.932 C 35.766 157.748 75.24 143.753 113.528 136.422 z" />
+    </Panel>
+</Button>
+<Button Classes="pathRemapBtn rtBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RT" Canvas.Left="1730.38" Canvas.Top="291.654">
+    <Panel>
+        <Path Classes="btnPath" Data="M 323.62 168.081 C 286.46 102.791 241.33 27.055 163.1 5.499 C 148.99 1.738 134.42 0 119.83 0.337 C 92.62 2.468 71.46 8.853 52.75 30.302 C 36.21 49.27 32.26 72.304 23.25 94.853 C 17.44 109.268 9.61 122.785 0 134.999 C 66.48 112.362 155.07 116.187 222.95 134.067 C 248.91 139.421 299.87 155.982 323.62 168.081 z" />
+        <Path Fill="{DynamicResource AccentColor}" Opacity="{Binding RightTriggerFill}" IsHitTestVisible="False" Data="M 323.62 168.081 C 286.46 102.791 241.33 27.055 163.1 5.499 C 148.99 1.738 134.42 0 119.83 0.337 C 92.62 2.468 71.46 8.853 52.75 30.302 C 36.21 49.27 32.26 72.304 23.25 94.853 C 17.44 109.268 9.61 122.785 0 134.999 C 66.48 112.362 155.07 116.187 222.95 134.067 C 248.91 139.421 299.87 155.982 323.62 168.081 z" />
+    </Panel>
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LB" Classes.active="{Binding ButtonLB}" Canvas.Left="424.396" Canvas.Top="430.452">
+    <Path Classes="btnPath" Data="M 167.396 75.932 C 223.116 66.798 295.195 55.881 351.801 62.117 C 368.244 63.928 395.029 73.341 412.668 77.126 C 384.512 60.872 385.156 53.785 365.197 31.533 C 336.912 0 260.752 0.271 220.88 2.371 C 166.739 7.196 54.571 26.979 13.508 67.729 C 3.807 77.357 2.115 98.289 0 112.039 C 50.831 98.673 115.295 84.059 167.396 75.932 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RB" Classes.active="{Binding ButtonRB}" Canvas.Left="1665.73" Canvas.Top="429.738">
+    <Path Classes="btnPath" Data="M 291.51 85.173 C 330.16 93.145 373.84 102.089 411.78 112.854 C 407.68 87.311 408.75 74.072 385.33 57.166 C 371.79 47.395 353.12 40.419 337.26 34.69 C 272.99 10.751 204.56 0 136.04 3.08 C 103.15 5.91 64.12 9.354 42.89 36.685 C 27.99 55.863 20.6 65.118 0 77.706 C 15.87 73.511 48.12 63.556 62.4 62.425 C 133.4 56.8 222.45 72.066 291.51 85.173 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="SAX_L" Classes.active="{Binding PaddleRemaps[4].IsPressed}" Canvas.Left="175.233" Canvas.Top="685.799">
+    <Path Classes="btnPath" Data="M 150.577 0.075 C 131.311 6.333 100.114 13.106 92.28 31.486 C 83.468 52.161 76.157 76.258 69.082 97.769 C 48.568 159.248 29.887 221.323 13.065 283.913 C 10.03 295.185 0.88 326.691 0 336.251 L 0.921 337.611 L 2.038 337.471 C 12.522 308.916 26.183 277.94 38.27 249.946 C 60.856 197.43 84.369 145.317 108.798 93.633 L 140.172 27.241 C 142.934 21.425 151.362 5.519 152.596 0.67 C 150.713 0 151.226 0.05 150.577 0.075 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="SAX_R" Classes.active="{Binding PaddleRemaps[5].IsPressed}" Canvas.Left="2173.0" Canvas.Top="684.941">
+    <Path Classes="btnPath" Data="M 0 0 C 41.06 87.761 80.76 176.146 119.11 265.125 C 122.84 273.943 148.72 339.499 151.03 341.569 C 150.35 323.989 133.1 266.174 127.77 247.354 C 114.56 199.686 100.33 152.306 85.08 105.249 C 78.88 85.796 65.81 37.491 53.08 22.517 C 47.66 16.135 10.02 2.755 0 0 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Back" Classes.active="{Binding ButtonBack}" Canvas.Left="728.489" Canvas.Top="642.487">
+    <Path Classes="btnPath" Data="M 39.771 0.75 C 70.111 0 82.101 17.437 87.325 44.31 C 94.738 82.451 133.32 148.27 72.619 160.856 C 31.227 162.56 29.724 134.922 20.211 103.17 C 15.96 88.337 11.828 73.34 7.761 58.472 C 0 30.1 10.269 7.732 39.771 0.75 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Start" Classes.active="{Binding ButtonStart}" Canvas.Left="1640.17" Canvas.Top="643.091">
+    <Path Classes="btnPath" Data="M 72.03 0.166 C 144.65 0 105.42 82.297 97.07 119.955 C 91.78 143.841 85.29 154.874 61.2 160.19 C 0 161.672 15.3 105.339 28.1 67.76 C 38.27 37.913 33 7.85 72.03 0.166 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Guide" Classes.active="{Binding ButtonGuide}" Canvas.Left="1170.41" Canvas.Top="1190.53">
+    <Path Classes="btnPath" Data="M 65.85 5.25 C 104.8 0 140.58 27.43 145.63 66.4 C 150.68 105.38 123.06 141.03 84.06 145.87 C 45.35 150.68 10.02 123.31 5.01 84.62 C 0 45.93 27.18 10.46 65.85 5.25 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="A" Classes.active="{Binding ButtonA}" Canvas.Left="1875.48" Canvas.Top="992.261">
+    <Path Classes="btnPath" Data="M 76.88 3.792 C 121.05 0 159.93 32.739 163.71 76.919 C 167.49 121.089 134.74 159.959 90.56 163.729 C 46.41 167.499 7.55 134.759 3.78 90.599 C 0 46.449 32.72 7.583 76.88 3.792 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="B" Classes.active="{Binding ButtonB}" Canvas.Left="2032.37" Canvas.Top="828.355">
+    <Path Classes="btnPath" Data="M 73.35 7.273 C 117 0 158.29 29.421 165.68 73.047 C 173.06 116.673 143.74 158.046 100.14 165.539 C 56.37 173.055 14.82 143.615 7.41 99.832 C 0 56.05 29.55 14.572 73.35 7.273 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="X" Classes.active="{Binding ButtonX}" Canvas.Left="1719.52" Canvas.Top="831.539">
+    <Path Classes="btnPath" Data="M 77.31 2.681 C 121.11 0 158.81 33.291 161.57 77.087 C 164.34 120.884 131.11 158.645 87.32 161.485 C 43.42 164.333 5.54 131.006 2.77 87.097 C 0 43.188 33.4 5.368 77.31 2.681 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Y" Classes.active="{Binding ButtonY}" Canvas.Left="1879.55" Canvas.Top="671.008">
+    <Path Classes="btnPath" Data="M 77.86 1.267 C 121.29 0 157.55 34.113 158.93 77.535 C 160.32 120.956 126.3 157.308 82.88 158.808 C 39.3 160.313 2.78 126.14 1.39 82.553 C 0 38.967 34.27 2.538 77.86 1.267 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LeftThumb" Classes.active="{Binding ButtonL3}" Canvas.Left="714.07" Canvas.Top="1126.39">
+    <Path Classes="btnPath" Data="M 155.722 273.33 C 228.943 265.08 281.58 198.98 273.24 125.77 C 264.9 52.56 198.748 0 125.545 8.42 C 52.46 16.83 0 82.85 8.327 155.95 C 16.653 229.04 82.617 281.58 155.722 273.33 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RightThumb" Classes.active="{Binding ButtonR3}" Canvas.Left="1493.27" Canvas.Top="1126.14">
+    <Path Classes="btnPath" Data="M 157.77 273.11 C 230.63 263.94 282.29 197.47 273.19 124.59 C 264.08 51.72 197.66 0 124.77 9.04 C 51.8 18.09 0 84.62 9.12 157.59 C 18.23 230.55 84.81 282.29 157.77 273.11 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G1" Classes.active="{Binding GKeyRemaps[0].IsPressed}" Canvas.Left="703.023" Canvas.Top="1602.62">
+    <Path Classes="btnPath" Data="M 160.6 52.79 C 190.735 36.94 181.193 0 137.265 3.54 C 104.389 6.19 64.298 1.3 30.123 4.22 C 0 20.53 16.385 52.71 32.005 52.65 C 65.831 52.54 129.442 56.21 160.6 52.79 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G2" Classes.active="{Binding GKeyRemaps[1].IsPressed}" Canvas.Left="944.244" Canvas.Top="1596.62">
+    <Path Classes="btnPath" Data="M 88.406 59.24 C 107.456 59.6 141.116 63.82 155.736 51.42 C 167.556 41.39 160.956 13.24 145.226 10.91 C 123.876 7.75 100.466 10.3 78.626 9.43 C 55.261 9.98 3.562 0 1.876 33.34 C 0 70.43 62.146 59.22 88.406 59.24 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G3" Classes.active="{Binding GKeyRemaps[2].IsPressed}" Canvas.Left="1168.44" Canvas.Top="1603.52">
+    <Path Classes="btnPath" Data="M 141.71 51.7 C 169.74 37.14 156.07 4.48 141.99 4.11 C 104.46 3.13 54.4 0 17.29 3.34 C 9.76 7.84 3.58 12.1 1.57 21.31 C 0 28.44 1.37 35.91 5.37 42.01 C 8.35 46.46 14.51 51.43 19.54 51.55 C 47.88 52.23 116.28 55.11 141.71 51.7 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G4" Classes.active="{Binding GKeyRemaps[3].IsPressed}" Canvas.Left="1384.37" Canvas.Top="1603.58">
+    <Path Classes="btnPath" Data="M 149.91 51.48 C 176.68 36.04 165.19 3.78 146.96 3.6 C 108.58 3.22 60.47 0 22.53 3.28 C 0.95 16.1 0 45.27 24.63 51.58 C 41.68 55.96 73.41 50.39 91.36 52.58 C 106.15 52.41 136.86 53.56 149.91 51.48 z" />
+</Button>
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G5" Classes.active="{Binding GKeyRemaps[4].IsPressed}" Canvas.Left="1615.56" Canvas.Top="1604.99">
+    <Path Classes="btnPath" Data="M 147.86 50.07 C 162.83 40.92 168.91 27.07 158.98 11.31 C 156.32 7.08 150.71 2.63 145.41 2.28 C 110.82 0 75.73 1.72 41.03 1.22 C 33.29 1.11 24.34 1.14 16.74 1.97 C 9.88 6.05 3.99 10.37 1.87 18.46 C 0 25.63 0.7 33.28 4.53 39.68 C 7.52 44.68 11.91 48.31 17.6 49.69 C 28.4 52.32 134.38 52.42 147.86 50.07 z" />
+</Button>
+
+<!-- D-PAD DIRECTIONAL FADES -->
+<Canvas Clip="M 528.67 740.199 C 540.563 738.245 581.082 744.187 591.313 752.871 C 598.786 759.215 596.807 787.96 596.748 798.354 L 596.678 850.018 C 615.631 850.326 634.835 849.778 653.671 850 C 664.425 850.617 689.929 846.667 696.065 858.529 C 712.057 889.445 709.721 937.938 700.78 970.946 C 698.345 979.934 694.574 983.533 687.767 988.259 C 657.389 988.026 627.01 988.103 596.633 988.491 C 596.528 1008.74 596.552 1028.99 596.704 1049.25 C 596.822 1073.37 601.738 1095.98 570.623 1100.18 C 558.35 1101.84 547.744 1103.08 535.179 1103.52 C 518.595 1103.47 505.194 1102.52 489.121 1099.31 C 459.157 1093.31 465.439 1071.67 465.736 1048.54 C 466.015 1028.48 466.042 1008.41 465.819 988.35 C 450.655 988.008 376.634 991.258 368.598 984.585 C 356.338 974.406 354.734 947.221 353.907 932.389 C 352.768 911.967 352.799 871.773 367.671 855.972 C 370.552 852.91 373.972 851.714 378.036 851.004 C 396.904 847.709 445.165 850.128 466.774 850.021 L 466.938 788.338 C 466.926 781.776 465.833 766.108 467.089 760.425 C 471.199 741.822 515.73 740.886 528.67 740.199 z">
+    <Button Classes="pathRemapBtn dpadUp" Command="{Binding BeginRemapCommand}" CommandParameter="Up" Classes.active="{Binding DPadUp}" Canvas.Left="315" Canvas.Top="718">
+        <Polygon Classes="btnPath" Points="0,0 433,0 216,210" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadRight" Command="{Binding BeginRemapCommand}" CommandParameter="Right" Classes.active="{Binding DPadRight}" Canvas.Left="531" Canvas.Top="718">
+        <Polygon Classes="btnPath" Points="217,0 217,421 0,210" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadDown" Command="{Binding BeginRemapCommand}" CommandParameter="Down" Classes.active="{Binding DPadDown}" Canvas.Left="315" Canvas.Top="928">
+        <Polygon Classes="btnPath" Points="433,211 0,211 216,0" />
+    </Button>
+    <Button Classes="pathRemapBtn dpadLeft" Command="{Binding BeginRemapCommand}" CommandParameter="Left" Classes.active="{Binding DPadLeft}" Canvas.Left="315" Canvas.Top="718">
+        <Polygon Classes="btnPath" Points="0,421 0,0 216,210" />
+    </Button>
+</Canvas>
+
+                <Viewbox Width="2508" Height="2508" Stretch="Uniform" Canvas.Left="0" Canvas.Top="0">
+                    <Canvas Width="2048" Height="2048">
+<!-- Paddle_L5 Background -->
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 332.535 1286.14 C 340.885 1285.28 348.213 1285.53 355.678 1289.78 C 384.773 1306.37 414.577 1323.27 443.654 1339.78 C 460.334 1349.25 465.856 1369.19 458.086 1386.18 C 432.506 1442.1 406.532 1498.1 379.557 1553.36 C 376.709 1559.2 369.234 1565.01 364.19 1569.03 C 346.462 1578.25 335.911 1575.69 317.204 1574.24 C 272.407 1570.78 226.738 1564.59 246.128 1504.96 C 248.773 1496.82 252.293 1485.15 255.06 1476.27 L 280.708 1393.93 C 286.443 1375.56 292.059 1357.16 297.557 1338.72 C 304.647 1315.08 306 1294.68 332.535 1286.14 z M 362.386 1566.69 C 368.078 1562.73 372.865 1558.58 376.657 1552.65 C 386.36 1537.48 456.196 1387.44 458.297 1376.97 C 459.962 1368.68 458.565 1359.27 453.551 1352.36 C 450.768 1348.53 447.199 1345.47 443.329 1342.79 C 432.404 1335.2 350.723 1289.29 343.442 1288.19 C 341.023 1287.83 338.41 1287.74 335.99 1288.13 C 307.724 1295.65 306.568 1318.42 299.035 1343.09 L 278.988 1408.43 L 255.42 1483.8 C 251.578 1496.18 246.613 1509.13 244.256 1521.85 C 243.214 1527.48 243.725 1533.46 245.235 1538.96 C 247.869 1548.55 253.833 1556.42 262.584 1561.22 C 276.744 1568.98 336.311 1575.87 352.025 1571.17 C 355.638 1570.08 359.085 1568.5 362.386 1566.69 z" IsHitTestVisible="False" />
+<!-- Paddle_R5 Background -->
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1693.21 1286.25 C 1696.92 1285.87 1700.66 1286.12 1704.28 1286.99 C 1728.03 1292.78 1730.73 1314.95 1736.59 1334.71 L 1752.34 1387.21 L 1778.53 1474.82 C 1786.77 1502.61 1806.81 1544.94 1771.75 1564.62 C 1762.9 1569.58 1745.88 1571.69 1735.71 1572.89 C 1714.97 1575.34 1696.98 1580.06 1676.61 1573.19 C 1673.98 1571.84 1671.35 1570.28 1668.98 1568.81 C 1664.67 1566.13 1657.2 1558.79 1655.14 1554.35 C 1644.32 1530.95 1577.06 1393.85 1574.2 1376.19 C 1572.63 1366.8 1574.96 1357.17 1580.66 1349.53 C 1582.54 1346.98 1584.81 1344.75 1587.39 1342.9 C 1595.97 1336.83 1619.32 1324.25 1628.7 1319.43 C 1643.43 1311.86 1678.75 1288.28 1693.21 1286.25 z M 1680.09 1571.94 C 1699.65 1577.58 1750.68 1570.06 1770.58 1562.11 C 1784.21 1556.67 1792.98 1533.81 1788.68 1518.74 C 1769.3 1450.77 1748.06 1382.89 1728.03 1315.06 C 1722.16 1295.17 1709.11 1287.11 1688.67 1289.32 C 1661.35 1302.15 1633.91 1321.17 1606.86 1335.06 C 1596.76 1340.24 1584.29 1346.96 1578.59 1356.98 C 1576.09 1361.91 1575.49 1373.03 1576.94 1378.5 C 1582.23 1393.26 1590.53 1410.01 1597.11 1424.34 L 1641.35 1520.64 C 1652.04 1543.4 1656.43 1560.98 1680.09 1571.94 z" IsHitTestVisible="False" />
+<!-- Paddle_L4 Background -->
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 338.578 1070.21 C 342.74 1070.01 347.413 1070.35 351.301 1071.84 C 371.815 1079.67 392.641 1088.57 412.926 1096.99 C 442.36 1109.22 471.969 1121.06 501.086 1133.91 C 503.997 1135.28 506.695 1136.84 509.024 1139.06 C 524.321 1153.7 520.457 1172.57 516.012 1190.78 C 510.122 1214.92 504.102 1238.99 499.036 1263.3 C 495.93 1278.2 495.913 1289.07 484.443 1300.13 C 466.567 1313.74 444.421 1301.68 427.58 1291.08 C 411.561 1281.01 357.402 1257.54 347.127 1243.95 C 330.078 1221.39 324.942 1175.21 316.167 1147.53 C 306.207 1116.1 297.919 1082.22 338.578 1070.21 z M 484.275 1297.2 C 486.618 1294.28 489.006 1291.37 490.316 1287.82 C 495.268 1274.39 518.395 1174.51 517.31 1162.37 C 516.743 1156.03 514.053 1146.72 508.885 1142.61 C 504.952 1139.52 500.699 1136.86 496.199 1134.68 C 453.498 1113.81 403.727 1098.22 360.269 1077.99 C 353.123 1074.66 347.062 1072.67 339.082 1073.29 C 325.198 1075.63 310.697 1088.47 310.751 1102.23 C 310.869 1131.87 325.9 1169.59 331.881 1198.32 C 336.665 1221.31 342.309 1240.73 362.618 1252.69 C 386.481 1266.72 411.173 1278.96 435.491 1292.16 C 452.703 1301.42 465.949 1310.13 484.275 1297.2 z" IsHitTestVisible="False" />
+<!-- Paddle_R4 Background -->
+<Path Fill="{DynamicResource ControllerBodyColor}" Opacity="1" Data="M 1689.56 1072.16 C 1718.04 1070 1736.34 1090.71 1729.65 1118.6 C 1721.32 1153.4 1710.23 1188.36 1700.71 1222.84 C 1693.87 1247.58 1673.17 1258.02 1651.95 1268.29 C 1634.37 1277.01 1616.97 1286.6 1599.7 1295.92 C 1585.45 1303.6 1577.56 1308.98 1560.95 1305.59 C 1539.36 1294.57 1540.07 1277.21 1535.54 1255.84 C 1530.55 1228.08 1520.77 1198.92 1516.7 1171.23 C 1513.11 1139.94 1539.92 1132.74 1562.45 1124.01 C 1605.17 1107.45 1646.88 1088.22 1689.56 1072.16 z M 1558.75 1301.63 C 1572.11 1306.13 1577.18 1304.04 1589.25 1297.9 C 1614.16 1285.19 1638.59 1272.16 1663.38 1259.14 C 1681.17 1249.81 1692.63 1240.58 1698.52 1220.54 C 1707.9 1188.8 1716.67 1156.85 1725.44 1124.93 C 1726.56 1120.85 1728.28 1114.21 1728.34 1110.07 C 1728.65 1089.67 1713.84 1072.5 1693.24 1074.2 C 1685.39 1075.84 1669.81 1082.89 1661.64 1086.28 L 1612.29 1106.59 L 1563.67 1126.45 C 1532.9 1138.85 1512.1 1142.87 1521.38 1184.14 C 1527.55 1211.54 1534.79 1239.1 1540.3 1266.67 C 1543.47 1281.99 1544.49 1292.92 1558.75 1301.63 z" IsHitTestVisible="False" />
+
+        <!-- BUTTONS (Interactive) -->
+<!-- Paddle_L5 Button -->
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Paddle_L5" Classes.active="{Binding PaddleRemaps[3].IsPressed}" Canvas.Left="244.3" Canvas.Top="1285.3" Width="221.6" Height="293.0">
+    <Path Classes="btnPath" Data="M 88.279 0.86 C 96.629 0 103.957 0.25 111.422 4.5 C 140.517 21.09 170.321 37.99 199.398 54.5 C 216.078 63.97 221.6 83.91 213.83 100.9 C 188.25 156.82 162.276 212.82 135.301 268.08 C 132.453 273.92 124.978 279.73 119.934 283.75 C 102.206 292.97 91.655 290.41 72.948 288.96 C 28.151 285.5 -17.518 279.31 1.872 219.68 C 4.517 211.54 8.037 199.87 10.804 190.99 L 36.452 108.65 C 42.187 90.28 47.803 71.88 53.301 53.44 C 60.391 29.8 61.744 9.4 88.279 0.86 z" />
+</Button>
+<!-- Paddle_R5 Button -->
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Paddle_R5" Classes.active="{Binding PaddleRemaps[1].IsPressed}" Canvas.Left="1574.2" Canvas.Top="1285.9" Width="232.6" Height="294.2">
+    <Path Classes="btnPath" Data="M 119.01 0.38 C 122.72 0 126.46 0.25 130.08 1.12 C 153.83 6.91 156.53 29.08 162.39 48.84 L 178.14 101.34 L 204.33 188.95 C 212.57 216.74 232.61 259.07 197.55 278.75 C 188.7 283.71 171.68 285.82 161.51 287.02 C 140.77 289.47 122.78 294.19 102.41 287.32 C 99.78 285.97 97.15 284.41 94.78 282.94 C 90.47 280.26 83 272.92 80.94 268.48 C 70.12 245.08 2.86 107.98 0 90.32 C -1.57 80.93 0.76 71.3 6.46 63.66 C 8.34 61.11 10.61 58.88 13.19 57.03 C 21.77 50.96 45.12 38.38 54.5 33.56 C 69.23 25.99 104.55 2.41 119.01 0.38 z" />
+</Button>
+<!-- Paddle_L4 Button -->
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Paddle_L4" Classes.active="{Binding PaddleRemaps[2].IsPressed}" Canvas.Left="297.9" Canvas.Top="1070.0" Width="226.4" Height="243.7">
+    <Path Classes="btnPath" Data="M 40.659 0.2 C 44.821 0 49.494 0.34 53.382 1.83 C 73.896 9.66 94.722 18.56 115.007 26.98 C 144.441 39.21 174.05 51.05 203.167 63.9 C 206.078 65.27 208.776 66.83 211.105 69.05 C 226.402 83.69 222.538 102.56 218.093 120.77 C 212.203 144.91 206.183 168.98 201.117 193.29 C 198.011 208.19 197.994 219.06 186.524 230.12 C 168.648 243.73 146.502 231.67 129.661 221.07 C 113.642 211 59.483 187.53 49.208 173.94 C 32.159 151.38 27.023 105.2 18.248 77.52 C 8.288 46.09 0 12.21 40.659 0.2 z" />
+</Button>
+<!-- Paddle_R4 Button -->
+<Button Classes="pathRemapBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Paddle_R4" Classes.active="{Binding PaddleRemaps[0].IsPressed}" Canvas.Left="1512.1" Canvas.Top="1070.0" Width="224.2" Height="239.0">
+    <Path Classes="btnPath" Data="M 177.46 2.16 C 205.94 0 224.24 20.71 217.55 48.6 C 209.22 83.4 198.13 118.36 188.61 152.84 C 181.77 177.58 161.07 188.02 139.85 198.29 C 122.27 207.01 104.87 216.6 87.6 225.92 C 73.35 233.6 65.46 238.98 48.85 235.59 C 27.26 224.57 27.97 207.21 23.44 185.84 C 18.45 158.08 8.67 128.92 4.6 101.23 C 1.01 69.94 27.82 62.74 50.35 54.01 C 93.07 37.45 134.78 18.22 177.46 2.16 z" />
+</Button>
+                    </Canvas>
+                </Viewbox>
+
+                </Canvas>
+
+                <!-- Buttons, interactive layers, and lines to mapping texts -->
+        <!-- LT -->
+        <Polyline Classes="mapLine" Points="1956,375 1850,269 1370,269"  />
+        <Ellipse Classes="mapDot" Canvas.Left="1951" Canvas.Top="370" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LT" Classes.active="{Binding LeftTriggerActive}" Canvas.Right="4070" Canvas.Top="219"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='LT'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='LT'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- LB -->
+        <Polyline Classes="mapLine" Points="1947,469 1370,469"  />
+        <Ellipse Classes="mapDot" Canvas.Left="1942" Canvas.Top="464" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LB" Classes.active="{Binding ButtonLB}" Canvas.Right="4070" Canvas.Top="419"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='LB'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='LB'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- D-Pad Group -->
+        <Polyline Classes="mapLine" Points="1881,914 1370,914"  />
+        <Ellipse Classes="mapDot" Canvas.Left="1876" Canvas.Top="909" />
+
+        <!-- Up -->
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Up" Classes.active="{Binding DPadUp}" Canvas.Right="4210" Canvas.Top="724"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Up'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Up'}"
+                ToolTip.Placement="Left" >
+        </Button>
+
+        <!-- Left -->
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Left" Classes.active="{Binding DPadLeft}" Canvas.Right="4350" Canvas.Top="864"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Left'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Left'}"
+                ToolTip.Placement="Left" >
+        </Button>
+
+        <!-- Down -->
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Down" Classes.active="{Binding DPadDown}" Canvas.Right="4210" Canvas.Top="1004"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Down'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Down'}"
+                ToolTip.Placement="Left" >
+        </Button>
+
+        <!-- Right -->
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Right" Classes.active="{Binding DPadRight}" Canvas.Right="4070" Canvas.Top="864"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Right'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Right'}"
+                ToolTip.Placement="Left" >
+        </Button>
+
+        <!-- SAX_L -->
+        <Polyline Classes="mapLine" Points="1647,695 1573,621 1370,621"  />
+        <Ellipse Classes="mapDot" Canvas.Left="1642" Canvas.Top="690" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="SAX_L" Classes.active="{Binding PaddleRemaps[4].IsPressed}" Canvas.Right="4070" Canvas.Top="571"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='SAX_L'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='SAX_L'}"
+                ToolTip.Placement="Left" >
+        </Button>
+
+        <!-- SAX_R -->
+        <Polyline Classes="mapLine" Points="3550,695 3624,621 3820,621"  />
+        <Ellipse Classes="mapDot" Canvas.Left="3545" Canvas.Top="690" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="SAX_R" Classes.active="{Binding PaddleRemaps[5].IsPressed}" Canvas.Left="3860" Canvas.Top="571"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='SAX_R'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='SAX_R'}"
+                ToolTip.Placement="Right" >
+        </Button>
+
+        <!-- RT -->
+        <Polyline Classes="mapLine" Points="3241,375 3347,269 3820,269"  />
+        <Ellipse Classes="mapDot" Canvas.Left="3236" Canvas.Top="370" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RT" Classes.active="{Binding RightTriggerActive}" Canvas.Left="3860" Canvas.Top="219"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='RT'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='RT'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- RB -->
+        <Polyline Classes="mapLine" Points="3250,469 3820,469"  />
+        <Ellipse Classes="mapDot" Canvas.Left="3245" Canvas.Top="464" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RB" Classes.active="{Binding ButtonRB}" Canvas.Left="3860" Canvas.Top="419"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='RB'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='RB'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- ABXY Group -->
+        <Polyline Classes="mapLine" Points="3310,914 3820,914"  />
+        <Ellipse Classes="mapDot" Canvas.Left="3305" Canvas.Top="909" />
+
+        <!-- Y -->
+        <Button Classes="circleLabelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Y" Classes.active="{Binding ButtonY}" Canvas.Left="4000" Canvas.Top="724"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Y'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Y'}"
+                ToolTip.Placement="Right" >
+        </Button>
+
+        <!-- B -->
+        <Button Classes="circleLabelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="B" Classes.active="{Binding ButtonB}" Canvas.Left="4140" Canvas.Top="864"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='B'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='B'}"
+                ToolTip.Placement="Right" >
+        </Button>
+
+        <!-- A -->
+        <Button Classes="circleLabelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="A" Classes.active="{Binding ButtonA}" Canvas.Left="4000" Canvas.Top="1004"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='A'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='A'}"
+                ToolTip.Placement="Right" >
+        </Button>
+
+        <!-- X -->
+        <Button Classes="circleLabelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="X" Classes.active="{Binding ButtonX}" Canvas.Left="3860" Canvas.Top="864"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='X'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='X'}"
+                ToolTip.Placement="Right" >
+        </Button>
+
+        <!-- G1 -->
+        <Polyline Classes="mapLine" Points="2148,1631 2148,2000" />
+        <Ellipse Classes="mapDot" Canvas.Left="2143" Canvas.Top="1626" />
+        <Button Classes="circleLabelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G1" Classes.active="{Binding GKeyRemaps[0].IsPressed}" Canvas.Left="2088" Canvas.Top="2020"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='G1'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='G1'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- G2 -->
+        <Polyline Classes="mapLine" Points="2378,1632 2376,2000" />
+        <Ellipse Classes="mapDot" Canvas.Left="2373" Canvas.Top="1627" />
+        <Button Classes="circleLabelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G2" Classes.active="{Binding GKeyRemaps[1].IsPressed}" Canvas.Left="2316" Canvas.Top="2020"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='G2'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='G2'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- G3 -->
+        <Polyline Classes="mapLine" Points="2603,1631 2600,2000" />
+        <Ellipse Classes="mapDot" Canvas.Left="2598" Canvas.Top="1626" />
+        <Button Classes="circleLabelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G3" Classes.active="{Binding GKeyRemaps[2].IsPressed}" Canvas.Left="2540" Canvas.Top="2020"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='G3'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='G3'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- G4 -->
+        <Polyline Classes="mapLine" Points="2823,1632 2824,2000" />
+        <Ellipse Classes="mapDot" Canvas.Left="2818" Canvas.Top="1627" />
+        <Button Classes="circleLabelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G4" Classes.active="{Binding GKeyRemaps[3].IsPressed}" Canvas.Left="2764" Canvas.Top="2020"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='G4'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='G4'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- G5 -->
+        <Polyline Classes="mapLine" Points="3050,1631 3049,2000" />
+        <Ellipse Classes="mapDot" Canvas.Left="3045" Canvas.Top="1626" />
+        <Button Classes="circleLabelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="G5" Classes.active="{Binding GKeyRemaps[4].IsPressed}" Canvas.Left="2989" Canvas.Top="2020"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='G5'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='G5'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- View -->
+        <Polyline Classes="mapLine" Points="2145,723 2314,723" />
+        <Ellipse Classes="mapDot" Canvas.Left="2140" Canvas.Top="718" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Back" Classes.active="{Binding ButtonBack}" Canvas.Left="2354" Canvas.Top="673" HorizontalAlignment="Center"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Back'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Back'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- Menu -->
+        <Polyline Classes="mapLine" Points="3058,723 2894,723" />
+        <Ellipse Classes="mapDot" Canvas.Left="3053" Canvas.Top="718" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Start" Classes.active="{Binding ButtonStart}" Canvas.Left="2754" Canvas.Top="673" HorizontalAlignment="Center"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Start'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Start'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- LeftThumb -->
+        <Polyline Classes="mapLine" Points="2205,1267 1230,1267"  />
+        <Ellipse Classes="mapDot" Canvas.Left="2200" Canvas.Top="1262" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LeftThumb" Classes.active="{Binding ButtonL3}" Canvas.Right="4210" Canvas.Top="1217"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='LeftThumb'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='LeftThumb'}"
+                ToolTip.Placement="Left" >
+        </Button>
+
+        <!-- RightThumb -->
+        <Polyline Classes="mapLine" Points="2984,1267 3960,1267"  />
+        <Ellipse Classes="mapDot" Canvas.Left="2979" Canvas.Top="1262" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RightThumb" Classes.active="{Binding ButtonR3}" Canvas.Left="4000" Canvas.Top="1217"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='RightThumb'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='RightThumb'}"
+                ToolTip.Placement="Right" >
+        </Button>
+
+        <!-- Guide -->
+        <Polyline Classes="mapLine" Points="2596,1266 2604,780" />
+        <Ellipse Classes="mapDot" Canvas.Left="2591" Canvas.Top="1261" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Guide" Classes.active="{Binding ButtonGuide}" Canvas.Left="2554" Canvas.Top="673" HorizontalAlignment="Center"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Guide'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Guide'}"
+                ToolTip.Placement="Bottom" >
+        </Button>
+
+        <!-- Paddle_L4 -->
+        <Polyline Classes="mapLine" Points="1853,1460 1230,1460"  />
+        <Ellipse Classes="mapDot" Canvas.Left="1848" Canvas.Top="1455" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Paddle_L4" Classes.active="{Binding PaddleRemaps[2].IsPressed}" Canvas.Right="4210" Canvas.Top="1410"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Paddle_L4'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Paddle_L4'}"
+                ToolTip.Placement="Left" >
+        </Button>
+
+        <!-- Paddle_R4 -->
+        <Polyline Classes="mapLine" Points="3339,1457 3960,1457"  />
+        <Ellipse Classes="mapDot" Canvas.Left="3334" Canvas.Top="1452" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Paddle_R4" Classes.active="{Binding PaddleRemaps[0].IsPressed}" Canvas.Left="4000" Canvas.Top="1407"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Paddle_R4'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Paddle_R4'}"
+                ToolTip.Placement="Right" >
+        </Button>
+
+        <!-- Paddle_L5 -->
+        <Polyline Classes="mapLine" Points="1785,1753 1230,1753"  />
+        <Ellipse Classes="mapDot" Canvas.Left="1780" Canvas.Top="1748" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Paddle_L5" Classes.active="{Binding PaddleRemaps[3].IsPressed}" Canvas.Right="4210" Canvas.Top="1703"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Paddle_L5'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Paddle_L5'}"
+                ToolTip.Placement="Left" >
+        </Button>
+
+        <!-- Paddle_R5 -->
+        <Polyline Classes="mapLine" Points="3420,1755 3960,1755"  />
+        <Ellipse Classes="mapDot" Canvas.Left="3415" Canvas.Top="1750" />
+        <Button Classes="labelBtn" Command="{Binding BeginRemapCommand}" CommandParameter="Paddle_R5" Classes.active="{Binding PaddleRemaps[1].IsPressed}" Canvas.Left="4000" Canvas.Top="1705"
+                Content="{Binding RemapVersion, Converter={StaticResource RemapContentConverter}, ConverterParameter='Paddle_R5'}"
+                ToolTip.Tip="{Binding RemapVersion, Converter={StaticResource RemapTooltipConverter}, ConverterParameter='Paddle_R5'}"
+                ToolTip.Placement="Right" >
+        </Button>
+        <!-- Standard / Shift Mode Toggle -->
+        <Border Classes="modeToggle" Canvas.Left="2310" Canvas.Top="2320" Width="560" Height="90" Background="{DynamicResource ToggleContainerColor}" BorderBrush="{DynamicResource BorderColor}" BorderThickness="2" CornerRadius="45" Padding="4">
+            <Panel>
+                <!-- Animated Capsule -->
+                <Border Width="272" HorizontalAlignment="Left" Background="{DynamicResource ToggleCapsuleColor}" CornerRadius="40" Classes.shift="{Binding IsShiftMode}">
+                    <Border.Transitions>
+                        <Transitions>
+                            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.25" Easing="CircularEaseOut" />
+                        </Transitions>
+                    </Border.Transitions>
+                    <Border.Styles>
+                        <Style Selector="Border">
+                            <Setter Property="RenderTransform" Value="translateX(0px)" />
+                        </Style>
+                        <Style Selector="Border.shift">
+                            <Setter Property="RenderTransform" Value="translateX(276px)" />
+                        </Style>
+                    </Border.Styles>
+                </Border>
+                <!-- Buttons -->
+                <Grid ColumnDefinitions="*,*">
+                    <Button Grid.Column="0" Classes="modeSegment" Classes.active="{Binding !IsShiftMode}" Content="{DynamicResource Standard}" Command="{Binding SetStandardModeCommand}" />
+                    <Button Grid.Column="1" Classes="modeSegment" Classes.active="{Binding IsShiftMode}" Content="{DynamicResource Shift}" Command="{Binding SetShiftModeCommand}" />
+                </Grid>
+            </Panel>
+        </Border>
+
+            </Canvas>
+            </Panel>
+        </Viewbox>
+    </Grid>
+</UserControl>

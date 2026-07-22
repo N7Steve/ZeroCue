@@ -1,0 +1,233 @@
+{
+  "Mappings": [
+    {
+      "Name": "LeftThumbX",
+      "Type": "axis",
+      "ByteIndex": 1,
+      "BitMask": 0,
+      "Xbox360Target": "LeftThumbX"
+    },
+    {
+      "Name": "LeftThumbY",
+      "Type": "axis",
+      "ByteIndex": 3,
+      "BitMask": 0,
+      "Xbox360Target": "LeftThumbY"
+    },
+    {
+      "Name": "RightThumbX",
+      "Type": "axis",
+      "ByteIndex": 5,
+      "BitMask": 0,
+      "Xbox360Target": "RightThumbX"
+    },
+    {
+      "Name": "RightThumbY",
+      "Type": "axis",
+      "ByteIndex": 7,
+      "BitMask": 0,
+      "Xbox360Target": "RightThumbY"
+    },
+    {
+      "Name": "LeftTrigger",
+      "Type": "trigger",
+      "ByteIndex": 9,
+      "BitMask": 0,
+      "Xbox360Target": "LeftTrigger"
+    },
+    {
+      "Name": "RightTrigger",
+      "Type": "trigger",
+      "ByteIndex": 10,
+      "BitMask": 0,
+      "Xbox360Target": "RightTrigger"
+    },
+    {
+      "Name": "Up",
+      "Type": "dpad",
+      "ByteIndex": 11,
+      "BitMask": 96,
+      "Xbox360Target": "Up"
+    },
+    {
+      "Name": "Down",
+      "Type": "dpad",
+      "ByteIndex": 11,
+      "BitMask": 64,
+      "Xbox360Target": "Down"
+    },
+    {
+      "Name": "Left",
+      "Type": "dpad",
+      "ByteIndex": 11,
+      "BitMask": 32,
+      "Xbox360Target": "Left"
+    },
+    {
+      "Name": "Right",
+      "Type": "dpad",
+      "ByteIndex": 11,
+      "BitMask": 0,
+      "Xbox360Target": "Right"
+    },
+    {
+      "Name": "A",
+      "Type": "button_bc",
+      "ByteIndex": 12,
+      "BitMask": 1,
+      "Xbox360Target": "A"
+    },
+    {
+      "Name": "B",
+      "Type": "button_bc",
+      "ByteIndex": 12,
+      "BitMask": 2,
+      "Xbox360Target": "B"
+    },
+    {
+      "Name": "X",
+      "Type": "button_bc",
+      "ByteIndex": 12,
+      "BitMask": 4,
+      "Xbox360Target": "X"
+    },
+    {
+      "Name": "Y",
+      "Type": "button_bc",
+      "ByteIndex": 12,
+      "BitMask": 8,
+      "Xbox360Target": "Y"
+    },
+    {
+      "Name": "LeftShoulder",
+      "Type": "button_bc",
+      "ByteIndex": 12,
+      "BitMask": 16,
+      "Xbox360Target": "LeftShoulder"
+    },
+    {
+      "Name": "RightShoulder",
+      "Type": "button_bc",
+      "ByteIndex": 12,
+      "BitMask": 32,
+      "Xbox360Target": "RightShoulder"
+    },
+    {
+      "Name": "Back",
+      "Type": "button_bc",
+      "ByteIndex": 12,
+      "BitMask": 64,
+      "Xbox360Target": "Back"
+    },
+    {
+      "Name": "Start",
+      "Type": "button_bc",
+      "ByteIndex": 12,
+      "BitMask": 128,
+      "Xbox360Target": "Start"
+    },
+    {
+      "Name": "LeftThumb",
+      "Type": "button_bd",
+      "ByteIndex": 13,
+      "BitMask": 1,
+      "Xbox360Target": "LeftThumb"
+    },
+    {
+      "Name": "RightThumb",
+      "Type": "button_bd",
+      "ByteIndex": 13,
+      "BitMask": 2,
+      "Xbox360Target": "RightThumb"
+    },
+    {
+      "Name": "Guide",
+      "Type": "button_bd",
+      "ByteIndex": 13,
+      "BitMask": 128,
+      "Xbox360Target": "Guide"
+    },
+    {
+      "Name": "Paddle_R4",
+      "Type": "paddle",
+      "ByteIndex": 14,
+      "BitMask": 8,
+      "Xbox360Target": "Paddle_R4"
+    },
+    {
+      "Name": "Paddle_R5",
+      "Type": "paddle",
+      "ByteIndex": 14,
+      "BitMask": 16,
+      "Xbox360Target": "Paddle_R5"
+    },
+    {
+      "Name": "Paddle_L4",
+      "Type": "paddle",
+      "ByteIndex": 14,
+      "BitMask": 32,
+      "Xbox360Target": "Paddle_L4"
+    },
+    {
+      "Name": "Paddle_L5",
+      "Type": "paddle",
+      "ByteIndex": 14,
+      "BitMask": 64,
+      "Xbox360Target": "Paddle_L5"
+    },
+    {
+      "Name": "SAX_L",
+      "Type": "paddle",
+      "ByteIndex": 14,
+      "BitMask": 128,
+      "Xbox360Target": "SAX_L"
+    },
+    {
+      "Name": "SAX_R",
+      "Type": "paddle",
+      "ByteIndex": 15,
+      "BitMask": 1,
+      "Xbox360Target": "SAX_R"
+    },
+    {
+      "Name": "G2",
+      "Type": "gkey",
+      "ByteIndex": 1,
+      "BitMask": 2,
+      "Xbox360Target": "G2"
+    },
+    {
+      "Name": "G3",
+      "Type": "gkey",
+      "ByteIndex": 1,
+      "BitMask": 1,
+      "Xbox360Target": "G3"
+    },
+    {
+      "Name": "G4",
+      "Type": "gkey",
+      "ByteIndex": 1,
+      "BitMask": 4,
+      "Xbox360Target": "G4"
+    }
+  ],
+  "GeneratedAt": "2026-06-01T14:50:00Z",
+  "Baseline": [
+    6,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    128,
+    0,
+    0,
+    0,
+    0
+  ]
+}

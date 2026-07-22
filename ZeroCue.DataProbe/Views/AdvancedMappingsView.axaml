@@ -1,0 +1,419 @@
+﻿<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:ZeroCue.DataProbe.ViewModels"
+             xmlns:models="using:ZeroCue.DataProbe.Models"
+             xmlns:views="clr-namespace:ZeroCue.DataProbe.Views"
+             xmlns:controls="using:ZeroCue.DataProbe.Controls"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="920" d:DesignHeight="640"
+             x:Class="ZeroCue.DataProbe.Views.AdvancedMappingsView"
+             x:DataType="vm:MainViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.summaryTile">
+            <Setter Property="Background" Value="{DynamicResource PanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="14,10"/>
+        </Style>
+
+        <Style Selector="Button.summaryButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style Selector="Button.summaryButton /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+        <Style Selector="Button.summaryButton:pointerover Border.summaryTile">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+        </Style>
+
+        <Style Selector="Border.modifierTile">
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+            <Setter Property="Background" Value="{DynamicResource AltPanelBackgroundColor}"/>
+        </Style>
+
+        <Style Selector="Button.summaryButton:pointerover Border.modifierTile">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+        </Style>
+
+        <Style Selector="Border.shiftBindingPill">
+            <Setter Property="Background" Value="{DynamicResource AltPanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="Height" Value="48"/>
+        </Style>
+
+        <Style Selector="Border.shiftBindingIcon">
+            <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BoxShadow" Value="0 0 0 1 #22FFFFFF, 0 3 8 0 #33000000"/>
+            <Setter Property="CornerRadius" Value="7"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+        </Style>
+
+        <Style Selector="Button.closeIconButton">
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                        <materialIcons:MaterialIcon Kind="Close"
+                                                    Width="20"
+                                                    Height="20"
+                                                    Foreground="{TemplateBinding Foreground}"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+
+        <Style Selector="Border.layerSwitch">
+            <Setter Property="Background" Value="{DynamicResource ToggleContainerColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="3"/>
+            <Setter Property="Height" Value="46"/>
+        </Style>
+
+        <Style Selector="Button.layerSegment">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryColor}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="MinWidth" Value="128"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Button.layerSegment.active">
+            <Setter Property="Background" Value="{DynamicResource ToggleCapsuleColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+        </Style>
+
+        <Style Selector="Button.layerSegment:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+        </Style>
+
+        <Style Selector="Border.groupPanel">
+            <Setter Property="Background" Value="{DynamicResource PanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+
+        <Style Selector="Border.groupHeaderIcon">
+            <Setter Property="Background" Value="{DynamicResource AltPanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="8"/>
+        </Style>
+
+        <Style Selector="Border.mappingCard">
+            <Setter Property="Background" Value="{DynamicResource AltPanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Margin" Value="14,0,14,12"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.22"/>
+                    <BrushTransition Property="Background" Duration="0:0:0.22"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <Style Selector="Border.mappingCard:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+        <Style Selector="Border.mappingCard.highlighted">
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+        <Style Selector="Border.buttonIcon">
+            <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BoxShadow" Value="0 0 0 1 #22FFFFFF, 0 3 8 0 #33000000"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Width" Value="54"/>
+            <Setter Property="Height" Value="54"/>
+            <Setter Property="Padding" Value="6"/>
+        </Style>
+
+        <Style Selector="Border.textKey">
+            <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Width" Value="42"/>
+            <Setter Property="Height" Value="42"/>
+        </Style>
+
+        <Style Selector="Border.textKey TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <Style Selector="Border.targetToken">
+            <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BoxShadow" Value="0 0 0 1 #22FFFFFF, 0 3 8 0 #33000000"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Width" Value="54"/>
+            <Setter Property="Height" Value="54"/>
+        </Style>
+
+        <Style Selector="controls|GenericMappingIcon">
+            <Setter Property="Background" Value="{DynamicResource HeaderBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderHighlightColor}"/>
+        </Style>
+
+        <Style Selector="controls|GenericMappingIcon TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+        </Style>
+
+        <Style Selector="Border.commandRow">
+            <Setter Property="Background" Value="{DynamicResource ToggleContainerColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+            <Setter Property="Height" Value="54"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <BrushTransition Property="BorderBrush" Duration="0:0:0.22"/>
+                    <BrushTransition Property="Background" Duration="0:0:0.22"/>
+                </Transitions>
+            </Setter>
+        </Style>
+
+        <Style Selector="Button.commandRowButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Height" Value="62"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style Selector="Button.commandRowButton /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+        <Style Selector="Button.commandRowButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+
+        <Style Selector="Button.iconAction">
+            <Setter Property="Background" Value="{DynamicResource ToggleContainerColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="8"/>
+            <Setter Property="MinWidth" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
+        <Style Selector="Button.iconAction:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+        </Style>
+
+        <Style Selector="Button.iconAction.danger:pointerover">
+            <Setter Property="BorderBrush" Value="{DynamicResource ErrorColor}"/>
+        </Style>
+
+        <Style Selector="MenuFlyoutPresenter">
+            <Setter Property="Background" Value="{DynamicResource PanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="6"/>
+        </Style>
+
+        <Style Selector="MenuItem">
+            <Setter Property="Foreground" Value="{DynamicResource TextHeaderColor}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+
+        <Style Selector="Border.commandRow.highlighted">
+            <Setter Property="Background" Value="{DynamicResource AccentHoverColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentColor}"/>
+        </Style>
+
+        <Style Selector="Border.controllerPreviewPanel">
+            <Setter Property="Background" Value="{DynamicResource PanelBackgroundColor}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="*" Background="{DynamicResource AppBackgroundColor}">
+        <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <Grid Margin="24" MinHeight="420" MinWidth="828">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="5*" MinWidth="440"/>
+                <ColumnDefinition Width="20"/>
+                <ColumnDefinition Width="6*" MinWidth="320"/>
+            </Grid.ColumnDefinitions>
+
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid MinHeight="420">
+                    <StackPanel IsVisible="{Binding !HasVisibleAdvancedMappings}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14">
+                        <materialIcons:MaterialIcon Kind="TimelineQuestionOutline" Width="66" Height="66" Foreground="{DynamicResource BorderColor}"/>
+                        <TextBlock Text="{DynamicResource NoActiveMappings}" Foreground="{DynamicResource TextHeaderColor}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{DynamicResource NoActiveMappingsHint}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="13" HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <ItemsControl ItemsSource="{Binding VisibleAdvancedMappingGroups}" IsVisible="{Binding HasVisibleAdvancedMappings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:AdvancedMappingGroup">
+                                <Border Classes="groupPanel">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding GroupName}" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource TextHeaderColor}" Margin="14,14,14,12"/>
+
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="models:AdvancedMappingItem">
+                                                    <Border Classes="mappingCard"
+                                                            Classes.highlighted="{Binding IsHighlighted}"
+                                                            PointerEntered="MappingCard_PointerEntered"
+                                                            PointerExited="MappingCard_PointerExited">
+                                                        <Grid ColumnDefinitions="62,22,*">
+                                                            <Border Grid.Column="0" Classes="buttonIcon">
+                                                                <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <Image Source="{Binding SourceIcon}" Width="42" Height="42" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding HasSourceIcon}"/>
+                                                                    <controls:GenericMappingIcon Text="{Binding SourceFallbackText}" Width="42" Height="42" CornerRadius="7" IsVisible="{Binding HasSourceFallback}"/>
+                                                                </Grid>
+                                                            </Border>
+
+                                                            <Border Grid.Column="1" Width="1" Margin="0,2,0,2" Background="{DynamicResource BorderColor}"/>
+
+                                                            <Grid Grid.Column="2" Width="294" HorizontalAlignment="Left">
+                                                                <ItemsControl Grid.Column="0" ItemsSource="{Binding Commands}">
+                                                                    <ItemsControl.ItemTemplate>
+                                                                        <DataTemplate x:DataType="models:AdvancedMappingCommand">
+                                                                            <Grid ColumnDefinitions="170,28,54,42" Height="62" VerticalAlignment="Center">
+                                                                                <Button Grid.Column="0"
+                                                                                        Width="170"
+                                                                                        Classes="commandRowButton"
+                                                                                        Command="{Binding $parent[UserControl].DataContext.OpenDetailsRemapCommand}"
+                                                                                        CommandParameter="{Binding}">
+                                                                                    <Border Classes="commandRow" Classes.highlighted="{Binding IsHighlighted}" Width="170">
+                                                                                        <Grid ColumnDefinitions="Auto,*">
+                                                                                            <materialIcons:MaterialIcon Grid.Column="0" Kind="{Binding IconKind}" Width="18" Height="18" Foreground="{Binding AccentBrush}" VerticalAlignment="Center"/>
+                                                                                            <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryColor}" Margin="10,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                                                                        </Grid>
+                                                                                    </Border>
+                                                                                </Button>
+                                                                                <materialIcons:MaterialIcon Grid.Column="1" Kind="ArrowRightThin" Width="18" Height="18" Foreground="{DynamicResource TextMutedColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                                <Button Grid.Column="2"
+                                                                                        Width="54"
+                                                                                        Classes="commandRowButton"
+                                                                                        Command="{Binding $parent[UserControl].DataContext.OpenDetailsRemapCommand}"
+                                                                                        CommandParameter="{Binding}">
+                                                                                    <Grid Width="54" Height="54" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                                        <Border Classes="targetToken" IsVisible="{Binding HasTargetIcon}">
+                                                                                            <Image Source="{Binding TargetIcon}" Width="42" Height="42" Stretch="Uniform"/>
+                                                                                        </Border>
+                                                                                        <controls:GenericMappingIcon Text="{Binding TargetFallbackText}" Width="54" Height="54" CornerRadius="8" Padding="6" IsVisible="{Binding HasTargetFallback}"/>
+                                                                                        <TextBlock Text="{Binding Target}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondaryColor}" TextTrimming="CharacterEllipsis" IsVisible="{Binding HasTargetText}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                                        <Border Width="54" Height="54" CornerRadius="8" Background="{DynamicResource ToggleContainerColor}" IsVisible="{Binding !HasTargetContent}">
+                                                                                            <materialIcons:MaterialIcon Kind="LinkOff" Width="22" Height="22" Foreground="{DynamicResource TextMutedColor}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                                        </Border>
+                                                                                    </Grid>
+                                                                                </Button>
+                                                                                <Border Grid.Column="3" Width="42">
+                                                                                    <Button Classes="iconAction danger"
+                                                                                            Margin="8,0,0,0"
+                                                                                            VerticalAlignment="Center"
+                                                                                            IsVisible="{Binding CanRemove}"
+                                                                                            Click="RemoveCommandButton_Click"
+                                                                                            ToolTip.Tip="{DynamicResource DeleteAction}">
+                                                                                        <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="16" Height="16" Foreground="{DynamicResource TextSecondaryColor}"/>
+                                                                                    </Button>
+                                                                                </Border>
+                                                                            </Grid>
+                                                                        </DataTemplate>
+                                                                    </ItemsControl.ItemTemplate>
+                                                                </ItemsControl>
+                                                                <Button Classes="iconAction"
+                                                                        Margin="0,14,0,0"
+                                                                        HorizontalAlignment="Right"
+                                                                        VerticalAlignment="Top"
+                                                                        IsVisible="{Binding HasAddableCommands}"
+                                                                        Click="AddCommandButton_Click"
+                                                                        ToolTip.Tip="{DynamicResource AddAction}">
+                                                                    <materialIcons:MaterialIcon Kind="Plus" Width="16" Height="16" Foreground="{DynamicResource AccentColor}"/>
+                                                                </Button>
+                                                            </Grid>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Grid>
+            </ScrollViewer>
+
+            <Border Grid.Column="2" Classes="controllerPreviewPanel">
+                <views:ControllerVectorView Classes="controllerSilhouette"
+                                            Opacity="1"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+            </Border>
+        </Grid>
+        </ScrollViewer>
+
+    </Grid>
+</UserControl>

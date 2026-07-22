@@ -61,6 +61,7 @@ namespace ZeroCue.DataProbe.Services
 
                 string runId = DateTime.Now.ToString("yyyyMMddHHmmss");
                 string tempDirPrefix = Path.Combine(workDir, $"zerocue_wdi_{config.LogName}_{runId}");
+                string targetPidValues = string.Join(",", config.PidValues.Select(PowerShellLiteral));
 
                 var ps1 = new StringBuilder();
                 ps1.AppendLine($"Write-Output '=== WDI Install Log {config.DisplayName} ({DateTime.Now:yyyyMMddHHmmss}) ===' > {PowerShellLiteral(wdiLog)}");
@@ -68,6 +69,23 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("    @(Get-ChildItem -Path (Join-Path $env:windir 'INF\\oem*.inf') -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)");
                 ps1.AppendLine("}");
                 ps1.AppendLine("$publishedInfsBefore = @(Get-PublishedInfNames)");
+                ps1.AppendLine($"$targetPidValues = @({targetPidValues})");
+                ps1.AppendLine("$selectedPidValue = $null");
+                ps1.AppendLine("foreach ($candidatePidValue in $targetPidValues) {");
+                ps1.AppendLine("    $candidateDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
+                ps1.AppendLine($"        $_.InstanceId -like \"USB\\VID_{config.VidValue}&PID_$candidatePidValue*\"");
+                ps1.AppendLine("    })");
+                ps1.AppendLine("    if ($null -ne $candidateDevices) { $selectedPidValue = $candidatePidValue; break }");
+                ps1.AppendLine("}");
+                ps1.AppendLine("if ($null -eq $selectedPidValue) {");
+                ps1.AppendLine($"    Write-Output \"No present {config.DisplayName} matched supported PIDs: $($targetPidValues -join ', ').\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine($"    Write-Output 'results=' > {PowerShellLiteral(resultPath)}");
+                ps1.AppendLine($"    Write-Output 'packages=' >> {PowerShellLiteral(resultPath)}");
+                ps1.AppendLine($"    Write-Output 'pid=' >> {PowerShellLiteral(resultPath)}");
+                ps1.AppendLine("    exit 2");
+                ps1.AppendLine("}");
+                ps1.AppendLine("$selectedPid = \"0x$selectedPidValue\"");
+                ps1.AppendLine($"Write-Output \"Selected VID_{config.VidValue}&PID_$selectedPidValue.\" >> {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine("Write-Host '=======================================' -ForegroundColor Cyan");
                 ps1.AppendLine($"Write-Host '  Installing WinUSB: {config.DisplayName}' -ForegroundColor Cyan");
                 ps1.AppendLine("Write-Host '=======================================' -ForegroundColor Cyan");
@@ -90,7 +108,7 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("    try {");
                 ps1.AppendLine("        $wdiOut = Join-Path -Path $tempDir -ChildPath 'wdi_out.log'");
                 ps1.AppendLine("        $wdiErr = Join-Path -Path $tempDir -ChildPath 'wdi_err.log'");
-                ps1.AppendLine($"        $argsArray = @('-n', {PowerShellLiteral(config.DeviceName)}, '-v', {PowerShellLiteral(config.Vid)}, '-p', {PowerShellLiteral(config.Pid)}, '-i', $interfaceId, '-t', '0', '-s', '-d', $tempDir)");
+                ps1.AppendLine($"        $argsArray = @('-n', {PowerShellLiteral(config.DeviceName)}, '-v', {PowerShellLiteral(config.Vid)}, '-p', $selectedPid, '-i', $interfaceId, '-t', '0', '-s', '-d', $tempDir)");
                 ps1.AppendLine($"        $proc = Start-Process -FilePath {PowerShellLiteral(wdiPath)} -ArgumentList $argsArray -PassThru -NoNewWindow -RedirectStandardOutput $wdiOut -RedirectStandardError $wdiErr");
                 ps1.AppendLine("        $maxWait = 60");
                 ps1.AppendLine("        $waited = 0");
@@ -98,7 +116,9 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("        while (-not $proc.HasExited -and $waited -lt $maxWait) {");
                 ps1.AppendLine("            Start-Sleep -Seconds 3");
                 ps1.AppendLine("            $waited += 3");
-                ps1.AppendLine($"            $devs = Get-PnpDevice -InstanceId \"USB\\VID_{config.VidValue}&PID_{config.PidValue}&MI_$miHex*\" -ErrorAction SilentlyContinue");
+                ps1.AppendLine("            $devs = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
+                ps1.AppendLine($"                $_.InstanceId -like \"USB\\VID_{config.VidValue}&PID_$selectedPidValue&MI_$miHex*\"");
+                ps1.AppendLine("            })");
                 ps1.AppendLine("            if ($null -ne $devs) {");
                 ps1.AppendLine("                if ($devs.Service -match 'WINUSB' -or $devs.Service -match 'WinUSB') {");
                 ps1.AppendLine($"                    Write-Output \"WINUSB detected on $($miString). Stopping the unresponsive wdi-simple process.\" >> {PowerShellLiteral(wdiLog)}");
@@ -112,7 +132,9 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue");
                 ps1.AppendLine("        }");
                 ps1.AppendLine("        Start-Sleep -Seconds 2");
-                ps1.AppendLine($"        $finalDevs = Get-PnpDevice -InstanceId \"USB\\VID_{config.VidValue}&PID_{config.PidValue}&MI_$miHex*\" -ErrorAction SilentlyContinue");
+                ps1.AppendLine("        $finalDevs = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
+                ps1.AppendLine($"            $_.InstanceId -like \"USB\\VID_{config.VidValue}&PID_$selectedPidValue&MI_$miHex*\"");
+                ps1.AppendLine("        })");
                 ps1.AppendLine("        if ($null -ne $finalDevs -and ($finalDevs.Service -match 'WINUSB' -or $finalDevs.Service -match 'WinUSB')) {");
                 ps1.AppendLine("            $ret = 0");
                 ps1.AppendLine("        } else {");
@@ -147,10 +169,11 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("foreach ($infName in $createdInfs) {");
                 ps1.AppendLine("    $infPath = Join-Path (Join-Path $env:windir 'INF') $infName");
                 ps1.AppendLine("    $content = Get-Content -LiteralPath $infPath -Raw -ErrorAction SilentlyContinue");
-                ps1.AppendLine($"    if ($content -match 'ZeroCue' -and $content -match 'VID_{config.VidValue}&PID_{config.PidValue}') {{ $ownedInfs += $infName }}");
+                ps1.AppendLine($"    if ($content -match 'ZeroCue' -and $content -match \"VID_{config.VidValue}&PID_$selectedPidValue\") {{ $ownedInfs += $infName }}");
                 ps1.AppendLine("}");
                 ps1.AppendLine($"Write-Output \"results=$($resultCodes -join ',')\" > {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine($"Write-Output \"packages=$($ownedInfs -join ',')\" >> {PowerShellLiteral(resultPath)}");
+                ps1.AppendLine($"Write-Output \"pid=$selectedPidValue\" >> {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine(BuildCorsairRestartScript());
                 ps1.AppendLine("Write-Host '=======================================' -ForegroundColor Cyan");
                 ps1.AppendLine("if ($resultCodes -notcontains -1) {");
@@ -310,8 +333,9 @@ namespace ZeroCue.DataProbe.Services
         {
             var ownedInfArray = string.Join(",", ownedPackages.Select(PowerShellLiteral));
             var targetPidArray = string.Join(",", config.RestorePidValues.Select(pid => PowerShellLiteral($"PID_{pid}")));
-            var legacyHardwareIdArray = string.Join(",", config.Interfaces.Select(iface =>
-                PowerShellLiteral($"VID_{config.VidValue}&PID_{config.PidValue}&MI_{iface.Id:X2}")));
+            var legacyHardwareIdArray = string.Join(",", config.PidValues.SelectMany(pid =>
+                config.Interfaces.Select(iface =>
+                    PowerShellLiteral($"VID_{config.VidValue}&PID_{pid}&MI_{iface.Id:X2}"))));
             return
                 BuildCorsairShutdownScript() +
                 "Start-Sleep -Seconds 3\r\n" +
@@ -450,7 +474,8 @@ namespace ZeroCue.DataProbe.Services
                     string.Equals(manifest.Target, config.LogName, StringComparison.Ordinal) &&
                     string.Equals(manifest.VidValue, config.VidValue, StringComparison.OrdinalIgnoreCase) &&
                     manifestPids != null &&
-                    expectedPids.SetEquals(manifestPids);
+                    manifestPids.Count > 0 &&
+                    manifestPids.IsSubsetOf(expectedPids);
 
                 if (!identityMatches)
                 {
@@ -633,14 +658,14 @@ namespace ZeroCue.DataProbe.Services
             string DisplayName,
             string DeviceName,
             string Vid,
-            string Pid,
+            string[] Pids,
             DriverInterface[] Interfaces)
         {
             public string VidValue => Vid.Replace("0x", "", StringComparison.OrdinalIgnoreCase);
-            public string PidValue => Pid.Replace("0x", "", StringComparison.OrdinalIgnoreCase);
-            public string[] RestorePidValues => LogName == "receiver"
-                ? new[] { "3A08", "3A09" }
-                : new[] { PidValue };
+            public string[] PidValues => Pids
+                .Select(pid => pid.Replace("0x", "", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            public string[] RestorePidValues => PidValues;
 
             public static DriverTargetConfig For(DriverTarget target)
             {
@@ -651,7 +676,7 @@ namespace ZeroCue.DataProbe.Services
                         "SCUF RF receiver",
                         "ZeroCue SCUF Envision Pro Receiver",
                         "0x1B1C",
-                        "0x3A08",
+                        new[] { "0x3A08", "0x3A09" },
                         new[]
                         {
                             new DriverInterface(4, "MI_04"),
@@ -659,10 +684,10 @@ namespace ZeroCue.DataProbe.Services
                         }),
                     _ => new DriverTargetConfig(
                         "gamepad",
-                        "SCUF Envision Pro controller",
-                        "ZeroCue SCUF Envision Pro",
+                        "SCUF Envision wired controller",
+                        "ZeroCue SCUF Envision Wired",
                         "0x1B1C",
-                        "0x3A05",
+                        new[] { "0x3A05", "0x3A04" },
                         new[]
                         {
                             new DriverInterface(0, "MI_00"),

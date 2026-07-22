@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace ZeroCue.DataProbe.Services
 {
     public sealed record SupportedScufDeviceProfile
@@ -5,6 +7,7 @@ namespace ZeroCue.DataProbe.Services
         public required string Name { get; init; }
         public required int VendorId { get; init; }
         public required int WiredPid { get; init; }
+        public required int[] ExperimentalWiredPids { get; init; }
         public required int WirelessBasePid { get; init; }
         public required int WirelessActivePid { get; init; }
         public required int HidUsagePage { get; init; }
@@ -18,7 +21,12 @@ namespace ZeroCue.DataProbe.Services
         public required byte RuntimeAckChannel { get; init; }
 
         public bool IsWired(int vendorId, int productId) =>
-            vendorId == VendorId && productId == WiredPid;
+            vendorId == VendorId && (productId == WiredPid || ExperimentalWiredPids.Contains(productId));
+
+        public bool IsExperimentalWired(int vendorId, int productId) =>
+            vendorId == VendorId && ExperimentalWiredPids.Contains(productId);
+
+        public int[] WiredPids => new[] { WiredPid }.Concat(ExperimentalWiredPids).ToArray();
 
         public bool IsWirelessReceiver(int vendorId, int productId) =>
             vendorId == VendorId && (productId == WirelessBasePid || productId == WirelessActivePid);
@@ -30,6 +38,7 @@ namespace ZeroCue.DataProbe.Services
             Name = "SCUF Envision Pro",
             VendorId = 0x1B1C,
             WiredPid = 0x3A05,
+            ExperimentalWiredPids = new[] { 0x3A04 },
             WirelessBasePid = 0x3A08,
             WirelessActivePid = 0x3A09,
             HidUsagePage = 0xFF42,

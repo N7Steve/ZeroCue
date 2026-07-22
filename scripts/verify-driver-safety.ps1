@@ -61,11 +61,13 @@ foreach ($fragment in $requiredFragments) {
 $requiredPortableTargets = @(
     '"0x1B1C"',
     '"0x3A05"',
+    '"0x3A04"',
     '"0x3A08"',
+    '"0x3A09"',
     'new DriverInterface(0, "MI_00")',
     'new DriverInterface(4, "MI_04")',
     'new DriverInterface(3, "MI_03")',
-    'new[] { "3A08", "3A09" }'
+    'manifestPids.IsSubsetOf(expectedPids)'
 )
 
 foreach ($fragment in $requiredPortableTargets) {
@@ -76,6 +78,10 @@ foreach ($fragment in $requiredPortableTargets) {
 
 if ($source -match 'new DriverInterface\([^\r\n]*[A-Fa-f0-9]{64}') {
     throw "Machine-derived driver fingerprints must not be stored in driver target configuration."
+}
+
+if ($source -match 'Get-PnpDevice[^\r\n]*-InstanceId[^\r\n]*\*') {
+    throw "Get-PnpDevice -InstanceId does not support wildcard matching; enumerate present devices and filter InstanceId instead."
 }
 
 Write-Host "Driver restoration is limited to manifest-owned packages or legacy packages with the exact portable INF signature, hardware IDs, and PnP instances."

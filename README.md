@@ -14,9 +14,11 @@ you manage mappings and device settings from a single interface.
 
 > [!CAUTION]
 > Hardware compatibility is currently guaranteed only for the SCUF Envision Pro
-> V2. The SCUF Envision Pro V1 and the standard wired SCUF Envision have not been
-> tested. ZeroCue is early alpha software: bugs, failed connections, crashes, and
-> unexpected behavior may occur, and reliable operation is not guaranteed.
+> V2. Wired SCUF Envision V2 devices using `VID_1B1C / PID_3A04` are detected as
+> an experimental, unvalidated profile that reuses the Pro V2 protocol. The SCUF
+> Envision Pro V1 has not been tested. ZeroCue is early alpha software: bugs,
+> failed connections, crashes, and unexpected behavior may occur, and reliable
+> operation is not guaranteed.
 
 ZeroCue is an independent project and is not affiliated with or endorsed by
 Corsair or SCUF Gaming.

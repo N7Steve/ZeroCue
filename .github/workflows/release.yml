@@ -73,7 +73,11 @@ jobs:
 
           $notes = Join-Path $env:RUNNER_TEMP "release-notes.md"
           @"
-          ZeroCue's first public alpha for Windows x64.
+          ZeroCue public alpha for Windows x64.
+
+          This build adds experimental wired detection and driver installation for
+          SCUF Envision V2 devices using VID_1B1C / PID_3A04. This profile reuses
+          the Envision Pro V2 protocol and is not yet validated on hardware.
 
           Driver installation is required for the connection mode you use. Install
           the controller driver for wired USB, the receiver driver for wireless, or

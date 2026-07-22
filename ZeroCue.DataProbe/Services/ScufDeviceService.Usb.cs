@@ -91,7 +91,7 @@ namespace ZeroCue.DataProbe.Services
                 if (!autoConnect)
                 {
                     SetWaitingForControllerStatus();
-                    LogInput($"[SYSTEM] Iniciando busqueda USB cableada por perfil: {DeviceProfile.Name} VID=0x{DeviceProfile.VendorId:X4} PID=0x{DeviceProfile.WiredPid:X4} reportSize={DeviceProfile.ReportSize}.");
+                    LogInput($"[SYSTEM] Iniciando busqueda USB cableada por perfil: {DeviceProfile.Name} VID=0x{DeviceProfile.VendorId:X4} PIDs={string.Join('/', DeviceProfile.WiredPids.Select(pid => $"0x{pid:X4}"))} reportSize={DeviceProfile.ReportSize}.");
                 }
 
                 await Task.Run(async () =>
@@ -130,6 +130,10 @@ namespace ZeroCue.DataProbe.Services
                             return;
                         }
                         throw new Exception("Mando Scuf no encontrado. Asegura el driver WinUSB.");
+                    }
+                    if (DeviceProfile.IsExperimentalWired(dev.VendorId, dev.ProductId))
+                    {
+                        LogInput($"[EXPERIMENTAL] Dispositivo cableado VID=0x{dev.VendorId:X4} PID=0x{dev.ProductId:X4} aceptado usando el protocolo de {DeviceProfile.Name}; la compatibilidad de este PID no esta validada.");
                     }
                     IsConnecting = true;
                     SetConnectionStatus(
@@ -1189,9 +1193,10 @@ byte _swPaddlesState = 0;
             foreach (var device in context.List())
             {
                 var isCandidate = DeviceProfile.IsWired(device.VendorId, device.ProductId);
+                var isExperimental = DeviceProfile.IsExperimentalWired(device.VendorId, device.ProductId);
                 if (isCandidate || logCandidates)
                 {
-                    LogInput($"[DETECT] USB candidate transport=LibUSB VID=0x{device.VendorId:X4} PID=0x{device.ProductId:X4} supported={isCandidate} reason={(isCandidate ? "VID/PID supported wired" : "VID/PID not in supported profile")}");
+                    LogInput($"[DETECT] USB candidate transport=LibUSB VID=0x{device.VendorId:X4} PID=0x{device.ProductId:X4} supported={isCandidate} experimental={isExperimental} reason={(isCandidate ? (isExperimental ? "VID/PID experimental wired profile" : "VID/PID supported wired") : "VID/PID not in supported profile")}");
                 }
 
                 if (selected == null && isCandidate && device is UsbDevice usbDevice)

@@ -67,7 +67,8 @@ $requiredPortableTargets = @(
     'new DriverInterface(0, "MI_00")',
     'new DriverInterface(4, "MI_04")',
     'new DriverInterface(3, "MI_03")',
-    'manifestPids.IsSubsetOf(expectedPids)'
+    'manifestPids.IsSubsetOf(expectedPids)',
+    '$candidateDevices.Count -gt 0'
 )
 
 foreach ($fragment in $requiredPortableTargets) {
@@ -82,6 +83,10 @@ if ($source -match 'new DriverInterface\([^\r\n]*[A-Fa-f0-9]{64}') {
 
 if ($source -match 'Get-PnpDevice[^\r\n]*-InstanceId[^\r\n]*\*') {
     throw "Get-PnpDevice -InstanceId does not support wildcard matching; enumerate present devices and filter InstanceId instead."
+}
+
+if ($source -match '\$null -ne \$candidateDevices') {
+    throw "An empty PowerShell array is not null; PID selection must require at least one matching present device."
 }
 
 Write-Host "Driver restoration is limited to manifest-owned packages or legacy packages with the exact portable INF signature, hardware IDs, and PnP instances."

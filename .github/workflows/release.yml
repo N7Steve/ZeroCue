@@ -75,9 +75,10 @@ jobs:
           @"
           ZeroCue public alpha for Windows x64.
 
-          This build adds experimental wired detection and driver installation for
-          SCUF Envision V2 devices using VID_1B1C / PID_3A04. This profile reuses
-          the Envision Pro V2 protocol and is not yet validated on hardware.
+          This build fixes automatic driver installation for experimental wired
+          SCUF Envision V2 devices using VID_1B1C / PID_3A04. Early hardware testing
+          confirms detection and input display. Remapping and full protocol behavior
+          remain experimental and are not yet fully validated.
 
           Driver installation is required for the connection mode you use. Install
           the controller driver for wired USB, the receiver driver for wireless, or

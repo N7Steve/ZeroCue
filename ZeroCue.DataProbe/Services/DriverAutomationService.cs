@@ -75,7 +75,7 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("    $candidateDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
                 ps1.AppendLine($"        $_.InstanceId -like \"USB\\VID_{config.VidValue}&PID_$candidatePidValue*\"");
                 ps1.AppendLine("    })");
-                ps1.AppendLine("    if ($null -ne $candidateDevices) { $selectedPidValue = $candidatePidValue; break }");
+                ps1.AppendLine("    if ($candidateDevices.Count -gt 0) { $selectedPidValue = $candidatePidValue; break }");
                 ps1.AppendLine("}");
                 ps1.AppendLine("if ($null -eq $selectedPidValue) {");
                 ps1.AppendLine($"    Write-Output \"No present {config.DisplayName} matched supported PIDs: $($targetPidValues -join ', ').\" >> {PowerShellLiteral(wdiLog)}");
@@ -119,7 +119,7 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("            $devs = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
                 ps1.AppendLine($"                $_.InstanceId -like \"USB\\VID_{config.VidValue}&PID_$selectedPidValue&MI_$miHex*\"");
                 ps1.AppendLine("            })");
-                ps1.AppendLine("            if ($null -ne $devs) {");
+                ps1.AppendLine("            if ($devs.Count -gt 0) {");
                 ps1.AppendLine("                if ($devs.Service -match 'WINUSB' -or $devs.Service -match 'WinUSB') {");
                 ps1.AppendLine($"                    Write-Output \"WINUSB detected on $($miString). Stopping the unresponsive wdi-simple process.\" >> {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine("                    Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue");
@@ -135,7 +135,7 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("        $finalDevs = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
                 ps1.AppendLine($"            $_.InstanceId -like \"USB\\VID_{config.VidValue}&PID_$selectedPidValue&MI_$miHex*\"");
                 ps1.AppendLine("        })");
-                ps1.AppendLine("        if ($null -ne $finalDevs -and ($finalDevs.Service -match 'WINUSB' -or $finalDevs.Service -match 'WinUSB')) {");
+                ps1.AppendLine("        if ($finalDevs.Count -gt 0 -and ($finalDevs.Service -match 'WINUSB' -or $finalDevs.Service -match 'WinUSB')) {");
                 ps1.AppendLine("            $ret = 0");
                 ps1.AppendLine("        } else {");
                 ps1.AppendLine("            $ret = -1");

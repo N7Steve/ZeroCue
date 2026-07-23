@@ -22,7 +22,7 @@ namespace ZeroCue.DataProbe.Services
     {
         private bool IsXboxButton(string target)
         {
-            target = NormalizeVirtualTarget(target);
+            target = VirtualTarget.GetBaseTarget(NormalizeVirtualTarget(target));
 
             return target switch
             {

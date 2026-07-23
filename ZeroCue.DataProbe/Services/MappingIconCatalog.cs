@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using ZeroCue.DataProbe.Models;
 
 namespace ZeroCue.DataProbe.Services
 {
@@ -387,14 +388,18 @@ namespace ZeroCue.DataProbe.Services
             };
         }
 
-        private static string Normalize(string mapping) => mapping switch
+        private static string Normalize(string mapping)
         {
-            "Back" => "Back",
-            "Y" => IconPaths.ContainsKey("Y") ? "Y" : mapping,
-            "OemComma" => "OemComma",
-            "OemPeriod" => "OemPeriod",
-            _ => mapping
-        };
+            mapping = VirtualTarget.GetBaseTarget(mapping);
+            return mapping switch
+            {
+                "Back" => "Back",
+                "Y" => IconPaths.ContainsKey("Y") ? "Y" : mapping,
+                "OemComma" => "OemComma",
+                "OemPeriod" => "OemPeriod",
+                _ => mapping
+            };
+        }
 
         private static string ApplyXGamepadVariant(string relativePath)
         {

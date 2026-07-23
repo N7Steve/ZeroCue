@@ -96,6 +96,10 @@ namespace ZeroCue.DataProbe.Models
         public bool HasTargetFallback => TargetIcon == null && !string.IsNullOrWhiteSpace(TargetFallbackText);
         public bool HasTargetText => TargetIcon == null && string.IsNullOrWhiteSpace(TargetFallbackText) && !string.IsNullOrWhiteSpace(Target);
         public bool HasTargetContent => HasTargetIcon || HasTargetFallback || HasTargetText;
+        public bool HasTriggerOutputPercent =>
+            VirtualTarget.IsTriggerTarget(Target)
+            && VirtualTarget.GetTriggerOutputPercent(Target) < 100;
+        public string TriggerOutputPercentLabel => $"{VirtualTarget.GetTriggerOutputPercent(Target)}%";
 
         public bool IsHighlighted
         {

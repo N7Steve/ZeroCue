@@ -314,14 +314,16 @@
 </Button>
 
 <!-- TRIGGERS AND BUMPERS -->
-<Button Classes="pathRemapBtn ltBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LeftTrigger" Classes.active="{Binding ButtonLT}" Canvas.Left="0" Canvas.Top="0">
+<Button Classes="pathRemapBtn ltBtn" Command="{Binding BeginRemapCommand}" CommandParameter="LeftTrigger" Classes.active="{Binding ButtonLT}" Canvas.Left="0" Canvas.Top="0"
+        PointerEntered="TriggerButton_OnPointerEntered" PointerExited="TriggerButton_OnPointerExited" PointerWheelChanged="TriggerButton_OnPointerWheelChanged">
     <Panel>
         <Path Fill="Transparent" Data="M 680.291 371.594 C 587.547 384.63 545.734 444.663 500.772 519.977 C 494.876 529.853 488.645 541.503 482.334 550.96 C 515.262 535.652 536.738 526.972 571.593 516.721 C 638.21 497.727 730.547 481.98 800.169 483.864 L 799.267 482.335 C 763.22 420.442 770.934 363.804 680.291 371.594 z" />
         <Path Classes="btnPath" Data="M 680.291 371.594 C 587.547 384.63 545.734 444.663 500.772 519.977 C 494.876 529.853 488.645 541.503 482.334 550.96 C 515.262 535.652 536.738 526.972 571.593 516.721 C 638.21 497.727 730.547 481.98 800.169 483.864 L 799.267 482.335 C 763.22 420.442 770.934 363.804 680.291 371.594 z" />
         <Path Fill="{DynamicResource AccentColor}" Opacity="{Binding LeftTriggerFill}" IsHitTestVisible="False" Data="M 680.291 371.594 C 587.547 384.63 545.734 444.663 500.772 519.977 C 494.876 529.853 488.645 541.503 482.334 550.96 C 515.262 535.652 536.738 526.972 571.593 516.721 C 638.21 497.727 730.547 481.98 800.169 483.864 L 799.267 482.335 C 763.22 420.442 770.934 363.804 680.291 371.594 z" />
     </Panel>
 </Button>
-<Button Classes="pathRemapBtn rtBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RightTrigger" Classes.active="{Binding ButtonRT}" Canvas.Left="0" Canvas.Top="0">
+<Button Classes="pathRemapBtn rtBtn" Command="{Binding BeginRemapCommand}" CommandParameter="RightTrigger" Classes.active="{Binding ButtonRT}" Canvas.Left="0" Canvas.Top="0"
+        PointerEntered="TriggerButton_OnPointerEntered" PointerExited="TriggerButton_OnPointerExited" PointerWheelChanged="TriggerButton_OnPointerWheelChanged">
     <Panel>
         <Path Fill="Transparent" Data="M 1700.97 483.829 C 1778.58 483.335 1881.32 499.897 1954.79 524.782 C 1978.26 533.361 1996.22 540.033 2018.56 551.547 C 1989.59 500.137 1957.23 444.767 1910.56 407.444 C 1877.25 380.804 1826.59 366.453 1784.21 371.696 C 1766.27 375.689 1750.78 382.564 1741.44 399.355 C 1726.51 426.174 1715.07 456.376 1700.97 483.829 z " />
         <Path Classes="btnPath" Data="M 1700.97 483.829 C 1778.58 483.335 1881.32 499.897 1954.79 524.782 C 1978.26 533.361 1996.22 540.033 2018.56 551.547 C 1989.59 500.137 1957.23 444.767 1910.56 407.444 C 1877.25 380.804 1826.59 366.453 1784.21 371.696 C 1766.27 375.689 1750.78 382.564 1741.44 399.355 C 1726.51 426.174 1715.07 456.376 1700.97 483.829 z " />
@@ -459,6 +461,39 @@
             </Canvas>
         </Panel>
     </Viewbox>
+
+    <StackPanel Grid.Row="0"
+                IsVisible="{Binding IsTriggerOutputDialMounted}"
+                Opacity="{Binding TriggerOutputDialOpacity}"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="0,0,0,26"
+                Spacing="4">
+        <StackPanel.Transitions>
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.18"/>
+            </Transitions>
+        </StackPanel.Transitions>
+        <Grid Width="84" Height="84" HorizontalAlignment="Center">
+            <Ellipse Fill="{DynamicResource HeaderBackgroundColor}"
+                     Stroke="{DynamicResource BorderHighlightColor}"
+                     StrokeThickness="5"/>
+            <Ellipse Margin="8"
+                     Fill="Transparent"
+                     Stroke="{DynamicResource AccentSemiTransparentColor}"
+                     StrokeThickness="3"/>
+            <TextBlock Text="{Binding TriggerOutputPercentText}"
+                       Foreground="{DynamicResource TextHeaderColor}"
+                       FontSize="20"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+        </Grid>
+        <TextBlock Text="{DynamicResource TriggerOutputScrollHint}"
+                   Foreground="{DynamicResource TextSecondaryColor}"
+                   FontSize="12"
+                   HorizontalAlignment="Center"/>
+    </StackPanel>
 </Grid>
 
 </UserControl>

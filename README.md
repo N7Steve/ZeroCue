@@ -6,11 +6,13 @@ wireless-receiver mode, exposes an Xbox-compatible virtual controller, and lets
 you manage mappings and device settings from a single interface.
 
 > [!WARNING]
-> ZeroCue is alpha software. Installing its driver is required: install the wired
-> controller driver, the wireless receiver driver, or both, depending on how you
-> intend to connect. Setup requires administrator privileges and replaces the
-> Windows driver for the selected SCUF interfaces. While that driver is installed,
-> iCUE cannot detect the controller through those interfaces.
+> ZeroCue is alpha software. ViGEmBus must be installed before installing the
+> ZeroCue WinUSB driver. ZeroCue replaces the Windows driver for the selected SCUF
+> interfaces, so without ViGEmBus the physical Xbox-compatible controller
+> disappears and ZeroCue cannot create the virtual Xbox 360 replacement.
+> Installing the wired controller driver, the wireless receiver driver, or both
+> requires administrator privileges. While a ZeroCue driver is installed, iCUE
+> cannot detect the controller through those interfaces.
 
 > [!CAUTION]
 > Hardware compatibility is currently guaranteed only for the SCUF Envision Pro
@@ -37,19 +39,40 @@ Corsair or SCUF Gaming.
   input/mapping activity.
 - Restricted driver recovery based on packages created and recorded by ZeroCue.
 
+## Requirements
+
+- Windows 10 or Windows 11 on an x64 PC.
+- [ViGEmBus 1.22.0](https://github.com/nefarius/ViGEmBus/releases/tag/v1.22.0)
+  installed and working. ZeroCue includes the ViGEm client library, but it does
+  not include or install the ViGEmBus system driver.
+
+ViGEmBus is what allows ZeroCue to expose the SCUF controller as a virtual Xbox
+360 controller. Without it, ZeroCue may still read the physical controller after
+WinUSB is installed, but games and gamepad testers will not see an Xbox
+controller. ZeroCue checks this requirement at startup and displays a warning if
+ViGEmBus is missing or unavailable.
+
+You can verify the installation in Windows Device Manager by selecting **View >
+Devices by connection** and looking for **Nefarius Virtual Gamepad Emulation
+Bus**. Its device status should report that it is working correctly. See the
+[official ViGEmBus installation and troubleshooting guide](https://docs.nefarius.at/projects/ViGEm/How-to-Install/).
+
 ## Install an alpha build
 
-1. Download the portable ZIP from the GitHub release.
-2. Extract the complete ZIP to a normal writable folder. Do not run the
+1. Install ViGEmBus 1.22.0 from the official release linked above. Restart
+   Windows if the installer requests it.
+2. Download the portable ZeroCue ZIP from the GitHub release.
+3. Extract the complete ZIP to a normal writable folder. Do not run the
    executable from inside the ZIP.
-3. Run `zerocue.exe`.
-4. Connect the controller by cable or its supported receiver.
-5. Install the required driver from ZeroCue: choose the controller driver for a
+4. Run `zerocue.exe`. If ZeroCue reports that ViGEmBus is unavailable, do not
+   install WinUSB until ViGEmBus is installed and working.
+5. Connect the controller by cable or its supported receiver.
+6. Install the required driver from ZeroCue: choose the controller driver for a
    wired USB connection or the receiver driver for a wireless connection. Install
    both if you plan to use both connection modes. Windows will show an
    administrator prompt. ZeroCue closes iCUE during the operation and reopens it
    when the operation ends.
-6. After installation, iCUE will no longer detect the controller through the
+7. After installation, iCUE will no longer detect the controller through the
    modified connection mode. Restore the original driver before using that mode
    with iCUE again.
 

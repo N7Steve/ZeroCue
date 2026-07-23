@@ -5,6 +5,7 @@ using Avalonia.Data.Converters;
 using Avalonia.Layout;
 using Avalonia.Media;
 using ZeroCue.DataProbe.Controls;
+using ZeroCue.DataProbe.Models;
 using ZeroCue.DataProbe.Services;
 
 namespace ZeroCue.DataProbe.Converters
@@ -20,17 +21,12 @@ namespace ZeroCue.DataProbe.Converters
         {
             if (parameter is string name)
             {
-                var svc = ScufDeviceService.Instance;
-                bool isRemapped = false;
-
-                if (name.StartsWith("Paddle_") || name.StartsWith("SAX_"))
-                    isRemapped = (RemapContext.IsShiftModeUi ? svc.ShiftPaddleRemapTable : svc.PaddleRemapTable).TryGetValue(name, out var target) && target != "Sin Mapeo" && !string.IsNullOrEmpty(target);
-                else if (name.StartsWith("G"))
-                    isRemapped = (RemapContext.IsShiftModeUi ? svc.ShiftGKeyRemapTable : svc.GKeyRemapTable).TryGetValue(name, out var target) && target != "Sin Mapeo" && !string.IsNullOrEmpty(target);
-                else if ((RemapContext.IsShiftModeUi ? svc.ShiftButtonRemapTable : svc.ButtonRemapTable).TryGetValue(name, out var target))
-                    isRemapped = target != name;
-
-                isRemapped = isRemapped || svc.GetAdvancedRemapCount(name, RemapContext.IsShiftModeUi) > 0;
+                var target = RemapConverterTargetResolver.GetTarget(name);
+                var isRemapped = target != "Original"
+                    && target != "Sin Mapeo"
+                    && !string.IsNullOrWhiteSpace(target);
+                isRemapped = isRemapped
+                    || ScufDeviceService.Instance.GetAdvancedRemapCount(name, RemapContext.IsShiftModeUi) > 0;
                 return new SolidColorBrush(Color.Parse(isRemapped ? "#FFB300" : "#5A6478"));
             }
 
@@ -132,17 +128,45 @@ namespace ZeroCue.DataProbe.Converters
         public static string GetTarget(string name)
         {
             var svc = ScufDeviceService.Instance;
+            var target = svc.GetRemapTarget(name, RemapGestureTypes.Simple, RemapContext.IsShiftModeUi);
+            if (string.IsNullOrWhiteSpace(target) || target == "Sin Mapeo")
+            {
+                return "Sin Mapeo";
+            }
 
-            if (name.StartsWith("Paddle_") || name.StartsWith("SAX_"))
-                return (RemapContext.IsShiftModeUi ? svc.ShiftPaddleRemapTable : svc.PaddleRemapTable).TryGetValue(name, out var target) ? target : "Sin Mapeo";
+            if (IsAuxiliarySource(name))
+            {
+                return target;
+            }
 
-            if (name.StartsWith("G"))
-                return (RemapContext.IsShiftModeUi ? svc.ShiftGKeyRemapTable : svc.GKeyRemapTable).TryGetValue(name, out var target) ? target : "Sin Mapeo";
+            var canonicalSource = CanonicalizeSourceName(name);
+            var isDefaultTarget = target == canonicalSource
+                || (VirtualTarget.GetBaseTarget(target) == canonicalSource
+                    && VirtualTarget.GetTriggerOutputPercent(target) == 100);
+            return isDefaultTarget ? "Original" : target;
+        }
 
-            if ((RemapContext.IsShiftModeUi ? svc.ShiftButtonRemapTable : svc.ButtonRemapTable).TryGetValue(name, out var buttonTarget))
-                return buttonTarget == name ? "Original" : buttonTarget;
+        private static bool IsAuxiliarySource(string name)
+        {
+            return name.StartsWith("Paddle_", StringComparison.Ordinal)
+                || name.StartsWith("SAX_", StringComparison.Ordinal)
+                || name is "G1" or "G2" or "G3" or "G4" or "G5";
+        }
 
-            return "Original";
+        private static string CanonicalizeSourceName(string name)
+        {
+            return name switch
+            {
+                "LB" => "LeftShoulder",
+                "RB" => "RightShoulder",
+                "LT" => "LeftTrigger",
+                "RT" => "RightTrigger",
+                "L3" => "LeftThumb",
+                "R3" => "RightThumb",
+                "View" => "Back",
+                "Menu" => "Start",
+                _ => name
+            };
         }
     }
 

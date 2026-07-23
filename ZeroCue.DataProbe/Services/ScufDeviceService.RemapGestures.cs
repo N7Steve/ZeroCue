@@ -490,6 +490,26 @@ namespace ZeroCue.DataProbe.Services
 
                 if (!_macroOutputRefs.TryGetValue(target, out var currentCount))
                 {
+                    if (!VirtualTarget.IsTriggerTarget(target))
+                    {
+                        return;
+                    }
+
+                    var baseTarget = VirtualTarget.GetBaseTarget(target);
+                    var matchingTriggerTargets = _macroOutputRefs.Keys.Where(
+                        activeTarget => VirtualTarget.IsTriggerTarget(activeTarget)
+                            && VirtualTarget.GetBaseTarget(activeTarget) == baseTarget)
+                        .ToArray();
+                    if (matchingTriggerTargets.Length == 0)
+                    {
+                        return;
+                    }
+
+                    foreach (var matchingTriggerTarget in matchingTriggerTargets)
+                    {
+                        _macroOutputRefs.Remove(matchingTriggerTarget);
+                        _macroFrameTargets.Remove(matchingTriggerTarget);
+                    }
                     return;
                 }
 
@@ -750,7 +770,8 @@ namespace ZeroCue.DataProbe.Services
 
         private static string NormalizeVirtualTarget(string target)
         {
-            return target switch
+            var baseTarget = VirtualTarget.GetBaseTarget(target);
+            var normalizedTarget = baseTarget switch
             {
                 "LB" => "LeftShoulder",
                 "RB" => "RightShoulder",
@@ -760,8 +781,12 @@ namespace ZeroCue.DataProbe.Services
                 "R3" => "RightThumb",
                 "View" => "Back",
                 "Menu" => "Start",
-                _ => target
+                _ => baseTarget
             };
+
+            return VirtualTarget.IsTriggerTarget(target)
+                ? VirtualTarget.WithTriggerOutputPercent(normalizedTarget, VirtualTarget.GetTriggerOutputPercent(target))
+                : normalizedTarget;
         }
 
         private static string ResolveSimpleButtonTarget(
@@ -784,8 +809,7 @@ namespace ZeroCue.DataProbe.Services
 
         private static bool IsTriggerTarget(string target)
         {
-            var normalizedTarget = NormalizeVirtualTarget(target);
-            return normalizedTarget == "LeftTrigger" || normalizedTarget == "RightTrigger";
+            return VirtualTarget.IsTriggerTarget(NormalizeVirtualTarget(target));
         }
 
         private static bool HasUsableAdvancedRemap(
@@ -864,13 +888,15 @@ namespace ZeroCue.DataProbe.Services
             if (IsTriggerTarget(simpleTarget) && !hasAdvanced)
             {
                 var normalizedTarget = NormalizeVirtualTarget(simpleTarget);
-                if (normalizedTarget == "LeftTrigger")
+                var baseTarget = VirtualTarget.GetBaseTarget(normalizedTarget);
+                var scaledAnalogOutput = VirtualTarget.ScaleTriggerOutput(analogOutput, normalizedTarget);
+                if (baseTarget == "LeftTrigger")
                 {
-                    leftTriggerOutput = leftTriggerOutput > analogOutput ? leftTriggerOutput : analogOutput;
+                    leftTriggerOutput = leftTriggerOutput > scaledAnalogOutput ? leftTriggerOutput : scaledAnalogOutput;
                 }
                 else
                 {
-                    rightTriggerOutput = rightTriggerOutput > analogOutput ? rightTriggerOutput : analogOutput;
+                    rightTriggerOutput = rightTriggerOutput > scaledAnalogOutput ? rightTriggerOutput : scaledAnalogOutput;
                 }
                 return;
             }
@@ -1190,6 +1216,27 @@ namespace ZeroCue.DataProbe.Services
             }
         }
 
+        private static byte GetMappedTriggerOutput(HashSet<string> frameTargets, string triggerTarget)
+        {
+            byte output = 0;
+            foreach (var target in frameTargets)
+            {
+                if (!VirtualTarget.IsTriggerTarget(target)
+                    || VirtualTarget.GetBaseTarget(target) != triggerTarget)
+                {
+                    continue;
+                }
+
+                var candidate = VirtualTarget.ScaleTriggerOutput(byte.MaxValue, target);
+                if (candidate > output)
+                {
+                    output = candidate;
+                }
+            }
+
+            return output;
+        }
+
         private void SubmitVirtualOutput(
             byte leftTrigger,
             byte rightTrigger,
@@ -1210,8 +1257,8 @@ namespace ZeroCue.DataProbe.Services
             _xbox.SetAxisValue(Xbox360Axis.LeftThumbY, leftStickOut.Y);
             _xbox.SetAxisValue(Xbox360Axis.RightThumbX, rightStickOut.X);
             _xbox.SetAxisValue(Xbox360Axis.RightThumbY, rightStickOut.Y);
-            var leftTriggerOut = _frameTargets.Contains("LeftTrigger") ? byte.MaxValue : leftTrigger;
-            var rightTriggerOut = _frameTargets.Contains("RightTrigger") ? byte.MaxValue : rightTrigger;
+            var leftTriggerOut = Math.Max(leftTrigger, GetMappedTriggerOutput(_frameTargets, "LeftTrigger"));
+            var rightTriggerOut = Math.Max(rightTrigger, GetMappedTriggerOutput(_frameTargets, "RightTrigger"));
             var xinputButtons = BuildExpectedXInputButtons();
             var vigemButtons = BuildExpectedVigemButtons(xinputButtons);
 

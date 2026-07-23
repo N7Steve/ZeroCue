@@ -590,6 +590,115 @@ namespace ZeroCue.DataProbe.ViewModels
             }
         }
 
+        private bool _isTriggerOutputDialVisible;
+        private bool _isTriggerOutputDialMounted;
+        private double _triggerOutputDialOpacity;
+        private int _triggerOutputDialFadeGeneration;
+        private string _hoveredTriggerOutputTarget = string.Empty;
+        private int _triggerOutputPercent = 100;
+
+        public bool IsTriggerOutputDialVisible
+        {
+            get => _isTriggerOutputDialVisible;
+            private set => SetProperty(ref _isTriggerOutputDialVisible, value);
+        }
+
+        public bool IsTriggerOutputDialMounted
+        {
+            get => _isTriggerOutputDialMounted;
+            private set => SetProperty(ref _isTriggerOutputDialMounted, value);
+        }
+
+        public double TriggerOutputDialOpacity
+        {
+            get => _triggerOutputDialOpacity;
+            private set => SetProperty(ref _triggerOutputDialOpacity, Math.Clamp(value, 0.0, 1.0));
+        }
+
+        public int TriggerOutputPercent
+        {
+            get => _triggerOutputPercent;
+            private set
+            {
+                if (SetProperty(ref _triggerOutputPercent, Math.Clamp(value, 0, 100)))
+                {
+                    OnPropertyChanged(nameof(TriggerOutputPercentText));
+                }
+            }
+        }
+
+        public string TriggerOutputPercentText => $"{TriggerOutputPercent}%";
+
+        public void BeginTriggerOutputSelection(string target)
+        {
+            if (!VirtualTarget.IsTriggerTarget(target))
+            {
+                return;
+            }
+
+            _hoveredTriggerOutputTarget = VirtualTarget.GetBaseTarget(
+                VirtualTarget.WithTriggerOutputPercent(target, 100));
+            var detectedBaseTarget = VirtualTarget.GetBaseTarget(DetectedTarget);
+            TriggerOutputPercent = detectedBaseTarget == _hoveredTriggerOutputTarget
+                ? VirtualTarget.GetTriggerOutputPercent(DetectedTarget)
+                : 100;
+
+            var fadeGeneration = ++_triggerOutputDialFadeGeneration;
+            IsTriggerOutputDialMounted = true;
+            IsTriggerOutputDialVisible = true;
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    if (fadeGeneration == _triggerOutputDialFadeGeneration && IsTriggerOutputDialVisible)
+                    {
+                        TriggerOutputDialOpacity = 1.0;
+                    }
+                },
+                DispatcherPriority.Background);
+        }
+
+        public void AdjustTriggerOutputSelection(double wheelDelta)
+        {
+            if (!IsTriggerOutputDialVisible || Math.Abs(wheelDelta) < 0.01)
+            {
+                return;
+            }
+
+            var nextValue = TriggerOutputPercent + (wheelDelta > 0 ? 5 : -5);
+            TriggerOutputPercent = nextValue <= 0 ? 0 : nextValue;
+        }
+
+        public void EndTriggerOutputSelection()
+        {
+            IsTriggerOutputDialVisible = false;
+            _hoveredTriggerOutputTarget = string.Empty;
+            TriggerOutputDialOpacity = 0.0;
+            var fadeGeneration = ++_triggerOutputDialFadeGeneration;
+            DispatcherTimer.RunOnce(
+                () =>
+                {
+                    if (fadeGeneration == _triggerOutputDialFadeGeneration && !IsTriggerOutputDialVisible)
+                    {
+                        IsTriggerOutputDialMounted = false;
+                    }
+                },
+                TimeSpan.FromMilliseconds(180));
+        }
+
+        private string ApplyPendingTriggerOutputPercent(string target)
+        {
+            if (!VirtualTarget.IsTriggerTarget(target))
+            {
+                return target;
+            }
+
+            var baseTarget = VirtualTarget.GetBaseTarget(
+                VirtualTarget.WithTriggerOutputPercent(target, 100));
+            return IsTriggerOutputDialVisible && baseTarget == _hoveredTriggerOutputTarget
+                ? VirtualTarget.WithTriggerOutputPercent(baseTarget, TriggerOutputPercent)
+                : VirtualTarget.WithTriggerOutputPercent(target, VirtualTarget.GetTriggerOutputPercent(target));
+        }
+
         private string GetGamepadIconName(string target) => target switch
         {
             "A" => "T_X_A_Color.png",
@@ -1668,6 +1777,11 @@ namespace ZeroCue.DataProbe.ViewModels
 
             // Property change propagation
             _service.PropertyChanged += Service_PropertyChanged;
+
+            if (!ViGEmBusDetector.IsAvailable())
+            {
+                ShowMissingViGEmBusModal();
+            }
         }
 
         private void RefreshLanguageOptions()
@@ -2983,6 +3097,17 @@ namespace ZeroCue.DataProbe.ViewModels
             IsDriverModalResultState = result;
         }
 
+        private void ShowMissingViGEmBusModal()
+        {
+            _pendingAction = PendingDriverAction.None;
+            SetDriverModalState(false, false, true);
+            IsDriverModalResultSuccess = false;
+            IsDriverModalResultError = true;
+            DriverModalTitle = LocalizationService.Get("ViGEmBusRequiredTitle");
+            DriverModalDescription = LocalizationService.Get("ViGEmBusRequiredDescription");
+            IsDriverModalOpen = true;
+        }
+
         private void ExecuteInstallDriverAsync()
         {
             if (IsProcessing) return;
@@ -3150,6 +3275,7 @@ namespace ZeroCue.DataProbe.ViewModels
             }
 
             _visibleRemapGestureTabs.Clear();
+            EndTriggerOutputSelection();
             RemappingTargetName = buttonName;
             SelectedRemapGestureType = RemapGestureTypes.Simple;
             UpdateDetectedTargetForSelectedGesture();
@@ -3169,6 +3295,7 @@ namespace ZeroCue.DataProbe.ViewModels
             }
 
             _visibleRemapGestureTabs.Clear();
+            EndTriggerOutputSelection();
             IsShiftMode = isShiftLayer;
             RemappingTargetName = buttonName;
             SelectedRemapGestureType = gestureType;
@@ -3319,6 +3446,7 @@ namespace ZeroCue.DataProbe.ViewModels
         private void CancelRemap()
         {
             StopMacroRecording();
+            EndTriggerOutputSelection();
             IsRemapping = false;
             _visibleRemapGestureTabs.Clear();
             NotifyRemapGestureStateChanged();
@@ -3327,6 +3455,7 @@ namespace ZeroCue.DataProbe.ViewModels
         private void AcceptRemap()
         {
             StopMacroRecording();
+            EndTriggerOutputSelection();
             if (RemapInputTabIndex == 3
                 && !string.IsNullOrWhiteSpace(ActionSelectedProfile)
                 && CanAssignLoadProfileAction)
@@ -3835,6 +3964,7 @@ namespace ZeroCue.DataProbe.ViewModels
                 return;
             }
 
+            key = ApplyPendingTriggerOutputPercent(key);
             DetectedTarget = key;
             ClearShiftModifierIfOverwritten(RemappingTargetName, SelectedRemapGestureType, DetectedTarget);
             _service.SetRemapTarget(RemappingTargetName, SelectedRemapGestureType, DetectedTarget, IsShiftMode);
@@ -3847,6 +3977,7 @@ namespace ZeroCue.DataProbe.ViewModels
             _service.SaveProfile(SelectedProfile);
 
             // Auto close modal
+            EndTriggerOutputSelection();
             IsRemapping = false;
             _visibleRemapGestureTabs.Clear();
         }
@@ -4127,6 +4258,7 @@ namespace ZeroCue.DataProbe.ViewModels
         {
             _service.ResetToDefaults();
             IsResetToDefaultDialogOpen = false;
+            EndTriggerOutputSelection();
             IsRemapping = false;
             IsShiftModifierPickerOpen = false;
             _visibleRemapGestureTabs.Clear();
@@ -4684,6 +4816,7 @@ namespace ZeroCue.DataProbe.ViewModels
                     OnPropertyChanged(nameof(HasTargetIcon));
                     OnPropertyChanged(nameof(TargetFallbackText));
                     OnPropertyChanged(nameof(HasTargetFallback));
+                    OnPropertyChanged(nameof(IsTriggerOutputStep));
                 }
             }
         }
@@ -4699,6 +4832,8 @@ namespace ZeroCue.DataProbe.ViewModels
                     OnPropertyChanged(nameof(HasTargetIcon));
                     OnPropertyChanged(nameof(TargetFallbackText));
                     OnPropertyChanged(nameof(HasTargetFallback));
+                    OnPropertyChanged(nameof(IsTriggerOutputStep));
+                    OnPropertyChanged(nameof(TriggerOutputPercent));
                 }
             }
         }
@@ -4712,6 +4847,7 @@ namespace ZeroCue.DataProbe.ViewModels
                 {
                     OnPropertyChanged(nameof(ActionDisplay));
                     OnPropertyChanged(nameof(ActionIconKind));
+                    OnPropertyChanged(nameof(IsTriggerOutputStep));
                 }
             }
         }
@@ -4729,6 +4865,31 @@ namespace ZeroCue.DataProbe.ViewModels
         public bool HasTargetIcon => TargetIcon != null;
         public string TargetFallbackText => MappingIconCatalog.GetFallbackText(Target);
         public bool HasTargetFallback => !HasTargetIcon && !string.IsNullOrWhiteSpace(TargetFallbackText);
+        public bool IsTriggerOutputStep =>
+            InputKind == MacroInputKinds.Gamepad
+            && Action != MacroActions.Up
+            && VirtualTarget.IsTriggerTarget(Target);
+
+        public int TriggerOutputPercent
+        {
+            get => VirtualTarget.GetTriggerOutputPercent(Target);
+            set
+            {
+                if (!VirtualTarget.IsTriggerTarget(Target))
+                {
+                    return;
+                }
+
+                var updatedTarget = VirtualTarget.WithTriggerOutputPercent(Target, Math.Clamp(value, 0, 100));
+                if (updatedTarget == Target)
+                {
+                    return;
+                }
+
+                Target = updatedTarget;
+                OnPropertyChanged();
+            }
+        }
 
         public int DelayMs
         {
@@ -4773,6 +4934,39 @@ namespace ZeroCue.DataProbe.ViewModels
         public bool IsAction { get; }
         public bool IsDelay { get; }
         public System.Windows.Input.ICommand RemoveCommand { get; }
+
+        public string TriggerOutputPercentText
+        {
+            get => Step.TriggerOutputPercent.ToString();
+            set
+            {
+                if (int.TryParse(value, out var parsed))
+                {
+                    var clamped = Math.Clamp(parsed, 0, 100);
+                    if (Step.TriggerOutputPercent != clamped)
+                    {
+                        Step.TriggerOutputPercent = clamped;
+                        OnPropertyChanged();
+                    }
+                    else if (parsed != clamped)
+                    {
+                        OnPropertyChanged();
+                    }
+                }
+                else if (string.IsNullOrWhiteSpace(value))
+                {
+                    if (Step.TriggerOutputPercent != 0)
+                    {
+                        Step.TriggerOutputPercent = 0;
+                        OnPropertyChanged();
+                    }
+                }
+                else
+                {
+                    OnPropertyChanged();
+                }
+            }
+        }
 
         public string DelayMsText
         {

@@ -75,16 +75,22 @@ jobs:
           @"
           ZeroCue public alpha for Windows x64.
 
-          This build fixes automatic driver installation for experimental wired
-          SCUF Envision V2 devices using VID_1B1C / PID_3A04. Early hardware testing
-          confirms detection and input display. Remapping and full protocol behavior
-          remain experimental and are not yet fully validated.
+          This build improves virtual-controller reliability and remapping:
 
-          Driver installation is required for the connection mode you use. Install
-          the controller driver for wired USB, the receiver driver for wireless, or
-          both. While a ZeroCue driver is installed, iCUE cannot detect the controller
-          through that connection mode. You can restore the original driver with
-          ZeroCue or independently through Windows Device Manager.
+          - Adds a startup check and warning when ViGEmBus is unavailable.
+          - Sends one atomic ViGEm report per frame to prevent ghost inputs when
+            swapping bumpers and triggers.
+          - Adds configurable 0-100% LT/RT output for mappings, gestures, Shift
+            mappings, and recorded macros.
+          - Fixes remapping icons for aliased controller buttons and refines the
+            trigger-output selector and macro editor.
+
+          ViGEmBus 1.22.0 must be installed before ZeroCue's WinUSB driver. Driver
+          installation is required for the connection mode you use: install the
+          controller driver for wired USB, the receiver driver for wireless, or
+          both. While a ZeroCue driver is installed, iCUE cannot detect the
+          controller through that connection mode. You can restore the original
+          driver with ZeroCue or independently through Windows Device Manager.
 
           The executables are not Authenticode-signed and may trigger Windows
           SmartScreen. Download only from this repository and verify the checksum.

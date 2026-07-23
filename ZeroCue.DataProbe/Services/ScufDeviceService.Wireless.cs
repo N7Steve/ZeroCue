@@ -105,6 +105,7 @@ namespace ZeroCue.DataProbe.Services
                     LogInput("[VIGEM] Inicializando ViGEm en modo wireless WinUSB...");
                     _client = new ViGEmClient();
                     _xbox = _client.CreateXbox360Controller();
+                    _xbox.AutoSubmitReport = false;
                     _xbox.Connect();
                     if (_xbox != null)
                     {

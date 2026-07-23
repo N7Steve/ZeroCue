@@ -195,6 +195,7 @@ namespace ZeroCue.DataProbe.Services
                         _client = new ViGEmClient();
                         LogInput("[VIGEM] Creando instancia de controlador virtual Xbox 360...");
                         _xbox = _client.CreateXbox360Controller();
+                        _xbox.AutoSubmitReport = false;
                         LogInput("[VIGEM] Conectando controlador virtual Xbox 360 al sistema...");
                         _xbox.Connect();
                         IsViGEmActive = true;
@@ -844,16 +845,8 @@ byte _swPaddlesState = 0;
                 if (_xbox != null)
                 {
                     // ── Sticks and triggers ──
-                    var leftStickOut = ApplyStickOutput(lx, LeftStickY);
-                    var rightStickOut = ApplyStickOutput(rx, RightStickY);
-                    _xbox.SetAxisValue(Xbox360Axis.LeftThumbX, leftStickOut.X);
-                    _xbox.SetAxisValue(Xbox360Axis.LeftThumbY, leftStickOut.Y);
-                    _xbox.SetAxisValue(Xbox360Axis.RightThumbX, rightStickOut.X);
-                    _xbox.SetAxisValue(Xbox360Axis.RightThumbY, rightStickOut.Y);
                     var ltOut = GetTriggerOutputByte(lt);
                     var rtOut = GetTriggerOutputByte(rt);
-                    _xbox.SetSliderValue(Xbox360Slider.LeftTrigger, ltOut);
-                    _xbox.SetSliderValue(Xbox360Slider.RightTrigger, rtOut);
 
                     // ── Collect paddle targets (which buttons paddles activate this frame) ──
                     _activePaddleTargets.Clear();

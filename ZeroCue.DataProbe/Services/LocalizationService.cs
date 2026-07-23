@@ -232,6 +232,8 @@ namespace ZeroCue.DataProbe.Services
             ["OperationFailedDescription"] = "An error occurred or the process was cancelled. Check the logs for more details.",
             ["UnexpectedError"] = "Unexpected Error",
             ["UnexpectedErrorDescription"] = "An error occurred: {0}",
+            ["ViGEmBusRequiredTitle"] = "ViGEmBus is required",
+            ["ViGEmBusRequiredDescription"] = "ViGEmBus is not installed or is not working correctly. ZeroCue needs it to create the virtual Xbox 360 controller detected by games.\n\nInstall ViGEmBus and restart ZeroCue. Without it, ZeroCue may read the SCUF controller, but games and gamepad testers will not detect an Xbox controller.",
             ["TriggerCurveLinearDescription"] = "Output matches the physical reading.",
             ["TriggerCurveExponentialDescription"] = "Fine travel at the start and more power at the end.",
             ["TriggerCurveDynamicDescription"] = "Smooth compensation: keeps control and raises response.",
@@ -260,7 +262,8 @@ namespace ZeroCue.DataProbe.Services
             ["MacroStartRecording"] = "Start Recording",
             ["MacroClear"] = "Clear Macro",
             ["MacroRepeatWhileHeld"] = "Repeat while held",
-            ["MacroRecordFixedDelay"] = "Record fixed delay"
+            ["MacroRecordFixedDelay"] = "Record fixed delay",
+            ["TriggerOutputScrollHint"] = "Scroll to change output percentage"
         };
 
         private static readonly Dictionary<string, string> SpanishStrings = new()
@@ -480,6 +483,8 @@ namespace ZeroCue.DataProbe.Services
             ["OperationFailedDescription"] = "Ocurrio un error o el proceso fue cancelado. Revisa los logs para mas detalles.",
             ["UnexpectedError"] = "Error inesperado",
             ["UnexpectedErrorDescription"] = "Se produjo un error: {0}",
+            ["ViGEmBusRequiredTitle"] = "ViGEmBus es necesario",
+            ["ViGEmBusRequiredDescription"] = "ViGEmBus no esta instalado o no funciona correctamente. ZeroCue lo necesita para crear el mando virtual Xbox 360 que detectan los juegos.\n\nInstala ViGEmBus y reinicia ZeroCue. Sin el, ZeroCue puede leer el mando SCUF, pero los juegos y los gamepad testers no detectaran un mando Xbox.",
             ["TriggerCurveLinearDescription"] = "Salida identica a la lectura fisica.",
             ["TriggerCurveExponentialDescription"] = "Recorrido fino al inicio y mas potencia al final.",
             ["TriggerCurveDynamicDescription"] = "Compensa suavemente: mantiene control y sube la respuesta.",
@@ -508,7 +513,8 @@ namespace ZeroCue.DataProbe.Services
             ["MacroStartRecording"] = "Iniciar grabación",
             ["MacroClear"] = "Limpiar macro",
             ["MacroRepeatWhileHeld"] = "Repetir mientras se mantiene pulsado",
-            ["MacroRecordFixedDelay"] = "Grabar con delay fijo"
+            ["MacroRecordFixedDelay"] = "Grabar con delay fijo",
+            ["TriggerOutputScrollHint"] = "Desplaza para cambiar el porcentaje de salida"
         };
 
         public static void SetLanguage(string? languageCode)

@@ -75,15 +75,14 @@ jobs:
           @"
           ZeroCue public alpha for Windows x64.
 
-          This build improves virtual-controller reliability and remapping:
+          This build fixes WinUSB installation for the SCUF RF receiver:
 
-          - Adds a startup check and warning when ViGEmBus is unavailable.
-          - Sends one atomic ViGEm report per frame to prevent ghost inputs when
-            swapping bumpers and triggers.
-          - Adds configurable 0-100% LT/RT output for mappings, gestures, Shift
-            mappings, and recorded macros.
-          - Fixes remapping icons for aliased controller buttons and refines the
-            trigger-output selector and macro editor.
+          - Installs PID 3A08 on its real MI_00 receiver interface.
+          - Installs the active PID 3A09 receiver as a whole device instead of
+            targeting nonexistent MI_03 and MI_04 interfaces.
+          - Adds bounded WDI waits, process-tree cleanup, and useful exit codes.
+          - Avoids indefinite console prompts and retains failed-install
+            diagnostics for troubleshooting.
 
           ViGEmBus 1.22.0 must be installed before ZeroCue's WinUSB driver. Driver
           installation is required for the connection mode you use: install the

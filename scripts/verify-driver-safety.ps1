@@ -64,11 +64,20 @@ $requiredPortableTargets = @(
     '"0x3A04"',
     '"0x3A08"',
     '"0x3A09"',
-    'new DriverInterface(0, "MI_00")',
-    'new DriverInterface(4, "MI_04")',
-    'new DriverInterface(3, "MI_03")',
+    'new DriverBinding("0x3A08", 0, "interface 0 (MI_00)")',
+    'new DriverBinding("0x3A09", null, "active receiver device")',
+    'new DriverBinding("0x3A05", 0, "interface 0 (MI_00)")',
+    'new DriverBinding("0x3A05", 4, "interface 4 (MI_04)")',
+    'new DriverBinding("0x3A05", 3, "interface 3 (MI_03)")',
+    'new DriverBinding("0x3A04", 0, "interface 0 (MI_00)")',
+    'new DriverBinding("0x3A04", 4, "interface 4 (MI_04)")',
+    'new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")',
     'manifestPids.IsSubsetOf(expectedPids)',
-    '$candidateDevices.Count -gt 0'
+    '$candidateDevices.Count -gt 0',
+    'if ($interfaceId -ge 0) { $argsArray += @(''-i'', $interfaceId) }',
+    "'-o', '15000'",
+    'taskkill.exe /PID $proc.Id /T /F',
+    'install diagnostics retained at:'
 )
 
 foreach ($fragment in $requiredPortableTargets) {
@@ -77,7 +86,7 @@ foreach ($fragment in $requiredPortableTargets) {
     }
 }
 
-if ($source -match 'new DriverInterface\([^\r\n]*[A-Fa-f0-9]{64}') {
+if ($source -match 'new DriverBinding\([^\r\n]*[A-Fa-f0-9]{64}') {
     throw "Machine-derived driver fingerprints must not be stored in driver target configuration."
 }
 
@@ -87,6 +96,18 @@ if ($source -match 'Get-PnpDevice[^\r\n]*-InstanceId[^\r\n]*\*') {
 
 if ($source -match '\$null -ne \$candidateDevices') {
     throw "An empty PowerShell array is not null; PID selection must require at least one matching present device."
+}
+
+if ($source -match 'new DriverBinding\(\"0x3A09\",\s*[0-9]') {
+    throw "PID 3A09 is a whole-device HID receiver state and must not be installed as a composite MI interface."
+}
+
+if ($source -match 'new DriverBinding\(\"0x3A08\",\s*(3|4)') {
+    throw "PID 3A08 exposes the receiver transport on MI_00, not the wired controller MI_03/MI_04 topology."
+}
+
+if ($source -match 'Read-Host') {
+    throw "The elevated driver workflow must not block indefinitely waiting for console input."
 }
 
 Write-Host "Driver restoration is limited to manifest-owned packages or legacy packages with the exact portable INF signature, hardware IDs, and PnP instances."

@@ -1,0 +1,92 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+        x:Class="ZeroCue.DataProbe.CloseConfirmationDialog"
+        Title="{DynamicResource CloseDialogTitle}"
+        Width="560"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Icon="/Assets/zerocue.ico"
+        Background="{DynamicResource AppBackgroundColor}">
+
+    <Border Background="{DynamicResource PanelBackgroundColor}"
+            BorderBrush="{DynamicResource BorderColor}"
+            BorderThickness="1"
+            Padding="32">
+        <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="22">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                <Border Width="48"
+                        Height="48"
+                        CornerRadius="24"
+                        Background="{DynamicResource AppBackgroundColor}"
+                        VerticalAlignment="Top">
+                    <materialIcons:MaterialIcon Kind="TrayArrowDown"
+                                                Width="25"
+                                                Height="25"
+                                                Foreground="{DynamicResource AccentColor}"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center" />
+                </Border>
+
+                <StackPanel Grid.Column="1" Spacing="9">
+                    <TextBlock Text="{DynamicResource CloseDialogTitle}"
+                               FontSize="23"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource TextHeaderColor}" />
+                    <TextBlock Text="{DynamicResource CloseDialogDescription}"
+                               MaxWidth="420"
+                               FontSize="15"
+                               Foreground="{DynamicResource TextSecondaryColor}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+
+            <CheckBox x:Name="RememberSelectionCheckBox"
+                      Grid.Row="1"
+                      Content="{DynamicResource RememberCloseSelection}"
+                      Foreground="{DynamicResource TextPrimaryColor}"
+                      FontSize="14"
+                      Margin="64,0,0,0" />
+
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                <Button Grid.Column="0"
+                        Content="{DynamicResource Cancel}"
+                        Click="Cancel_Clicked"
+                        IsCancel="True"
+                        Background="Transparent"
+                        Foreground="{DynamicResource TextSecondaryColor}"
+                        BorderBrush="{DynamicResource BorderColor}"
+                        BorderThickness="1"
+                        Padding="18,10"
+                        CornerRadius="6"
+                        FontSize="14"
+                        FontWeight="SemiBold" />
+
+                <Button Grid.Column="2"
+                        Content="{DynamicResource ExitApplication}"
+                        Click="Exit_Clicked"
+                        Background="Transparent"
+                        Foreground="#FF7676"
+                        BorderBrush="#764044"
+                        BorderThickness="1"
+                        Padding="20,10"
+                        CornerRadius="6"
+                        FontSize="14"
+                        FontWeight="SemiBold" />
+
+                <Button Grid.Column="3"
+                        Content="{DynamicResource MinimizeToTray}"
+                        Click="Minimize_Clicked"
+                        IsDefault="True"
+                        Background="{DynamicResource AccentColor}"
+                        Foreground="{DynamicResource AppBackgroundColor}"
+                        Padding="22,10"
+                        CornerRadius="6"
+                        FontSize="14"
+                        FontWeight="Bold" />
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

@@ -93,6 +93,50 @@
                             <ToggleSwitch Grid.Column="1" IsChecked="{Binding StartMinimized}" OffContent="{DynamicResource Disabled}" OnContent="{DynamicResource Enabled}" Foreground="{DynamicResource TextPrimaryColor}" VerticalAlignment="Center" Margin="18,0,0,0"/>
                         </Grid>
                     </StackPanel>
+
+                    <Border Height="1" Background="{DynamicResource BorderColor}" Margin="0,4,0,2"/>
+
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{DynamicResource CloseBehaviorSettings}" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource CloseBehavior}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="15"/>
+                                <TextBlock Text="{DynamicResource CloseBehaviorDescription}"
+                                           Foreground="{DynamicResource TextSecondaryColor}"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           HorizontalAlignment="Left"/>
+                            </StackPanel>
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding CloseBehaviorOptions}"
+                                      SelectedIndex="{Binding SelectedCloseBehaviorIndex}"
+                                      Width="220"
+                                      Margin="18,0,0,0"
+                                      VerticalAlignment="Center"
+                                      Background="{DynamicResource AppBackgroundColor}"
+                                      Foreground="{DynamicResource TextPrimaryColor}"
+                                      BorderBrush="{DynamicResource BorderColor}" />
+                        </Grid>
+
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource AskBeforeClosing}" Foreground="{DynamicResource TextPrimaryColor}" FontSize="15"/>
+                                <TextBlock Text="{DynamicResource AskBeforeClosingDescription}"
+                                           Foreground="{DynamicResource TextSecondaryColor}"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           HorizontalAlignment="Left"/>
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          IsChecked="{Binding AskBeforeClosing}"
+                                          OffContent="{DynamicResource Disabled}"
+                                          OnContent="{DynamicResource Enabled}"
+                                          Foreground="{DynamicResource TextPrimaryColor}"
+                                          VerticalAlignment="Center"
+                                          Margin="18,0,0,0"/>
+                        </Grid>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 

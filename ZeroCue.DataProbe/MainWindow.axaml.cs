@@ -1,7 +1,10 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
+using ZeroCue.DataProbe.Models;
 using ZeroCue.DataProbe.Services;
 using ZeroCue.DataProbe.ViewModels;
 
@@ -9,6 +12,11 @@ namespace ZeroCue.DataProbe;
 
 public partial class MainWindow : Window
 {
+    private WindowState _lastVisibleWindowState = WindowState.Maximized;
+    private bool _isHiddenInTray;
+    private bool _hideOnFirstOpen;
+    private bool _isCloseDialogOpen;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -19,6 +27,126 @@ public partial class MainWindow : Window
         AddHandler(InputElement.PointerPressedEvent, MainWindow_PointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(InputElement.PointerReleasedEvent, MainWindow_PointerReleased, RoutingStrategies.Tunnel, handledEventsToo: true);
         AddHandler(InputElement.PointerWheelChangedEvent, MainWindow_PointerWheelChanged, RoutingStrategies.Tunnel, handledEventsToo: true);
+        PropertyChanged += MainWindow_PropertyChanged;
+    }
+
+    public void StartHiddenInTray()
+    {
+        _hideOnFirstOpen = true;
+        WindowState = WindowState.Minimized;
+    }
+
+    public void MinimizeToTray()
+    {
+        if (!_isHiddenInTray)
+        {
+            if (WindowState != WindowState.Minimized)
+            {
+                _lastVisibleWindowState = WindowState;
+            }
+
+            _isHiddenInTray = true;
+            Hide();
+        }
+    }
+
+    public void RestoreFromTray()
+    {
+        _hideOnFirstOpen = false;
+        _isHiddenInTray = false;
+        WindowState = _lastVisibleWindowState;
+        Show();
+        Activate();
+    }
+
+    protected override void OnOpened(System.EventArgs e)
+    {
+        base.OnOpened(e);
+
+        if (_hideOnFirstOpen)
+        {
+            _hideOnFirstOpen = false;
+            Dispatcher.UIThread.Post(MinimizeToTray);
+        }
+    }
+
+    protected override async void OnClosing(WindowClosingEventArgs e)
+    {
+        if (!e.IsProgrammatic && e.CloseReason == WindowCloseReason.WindowClosing)
+        {
+            e.Cancel = true;
+            base.OnClosing(e);
+
+            var service = ScufDeviceService.Instance;
+            if (!service.AskBeforeClosing)
+            {
+                var rememberedChoice = service.CloseBehavior == ApplicationCloseBehavior.MinimizeToTray
+                    ? CloseApplicationChoice.MinimizeToTray
+                    : CloseApplicationChoice.Exit;
+                Dispatcher.UIThread.Post(() => ApplyCloseChoice(rememberedChoice));
+                return;
+            }
+
+            if (!_isCloseDialogOpen)
+            {
+                _isCloseDialogOpen = true;
+                try
+                {
+                    var dialog = new CloseConfirmationDialog();
+                    var result = await dialog.ShowDialog<CloseDialogResult>(this);
+
+                    if (result.RememberSelection &&
+                        result.Choice != CloseApplicationChoice.Cancel)
+                    {
+                        service.CloseBehavior = result.Choice == CloseApplicationChoice.MinimizeToTray
+                            ? ApplicationCloseBehavior.MinimizeToTray
+                            : ApplicationCloseBehavior.ExitApplication;
+                        service.AskBeforeClosing = false;
+                    }
+
+                    ApplyCloseChoice(result.Choice);
+                }
+                finally
+                {
+                    _isCloseDialogOpen = false;
+                }
+            }
+
+            return;
+        }
+
+        base.OnClosing(e);
+    }
+
+    private void ApplyCloseChoice(CloseApplicationChoice choice)
+    {
+        if (choice == CloseApplicationChoice.MinimizeToTray)
+        {
+            MinimizeToTray();
+        }
+        else if (choice == CloseApplicationChoice.Exit &&
+                 Application.Current is App app)
+        {
+            app.ShutdownApplication();
+        }
+    }
+
+    private void MainWindow_PropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property != WindowStateProperty)
+        {
+            return;
+        }
+
+        if (WindowState == WindowState.Minimized &&
+            (!_hideOnFirstOpen || IsVisible))
+        {
+            Dispatcher.UIThread.Post(MinimizeToTray);
+        }
+        else if (!_isHiddenInTray)
+        {
+            _lastVisibleWindowState = WindowState;
+        }
     }
 
     private void MainWindow_PointerWheelChanged(object? sender, PointerWheelEventArgs e)
@@ -159,10 +287,4 @@ public partial class MainWindow : Window
         };
     }
 
-    protected override void OnClosed(System.EventArgs e)
-    {
-        base.OnClosed(e);
-        // Desconectar el servicio al cerrar para liberar libusb
-        ScufDeviceService.Instance.Disconnect();
-    }
 }

@@ -346,6 +346,37 @@ namespace ZeroCue.DataProbe.ViewModels
             }
         }
 
+        public ObservableCollection<string> CloseBehaviorOptions { get; } = new ObservableCollection<string>();
+
+        private int _selectedCloseBehaviorIndex;
+        public int SelectedCloseBehaviorIndex
+        {
+            get => _selectedCloseBehaviorIndex;
+            set
+            {
+                var behaviorIndex = Math.Clamp(value, 0, 1);
+                if (SetProperty(ref _selectedCloseBehaviorIndex, behaviorIndex))
+                {
+                    _service.CloseBehavior = behaviorIndex == 0
+                        ? ApplicationCloseBehavior.MinimizeToTray
+                        : ApplicationCloseBehavior.ExitApplication;
+                }
+            }
+        }
+
+        public bool AskBeforeClosing
+        {
+            get => _service.AskBeforeClosing;
+            set
+            {
+                if (_service.AskBeforeClosing != value)
+                {
+                    _service.AskBeforeClosing = value;
+                    OnPropertyChanged(nameof(AskBeforeClosing));
+                }
+            }
+        }
+
         private int _selectedThemeIndex = 0;
         public int SelectedThemeIndex
         {
@@ -1669,8 +1700,10 @@ namespace ZeroCue.DataProbe.ViewModels
             _service = ScufDeviceService.Instance;
             LocalizationService.SetLanguage(_service.LanguageCode);
             RefreshLanguageOptions();
+            RefreshCloseBehaviorOptions();
             _selectedLanguageIndex = LocalizationService.GetLanguageIndex(_service.LanguageCode);
             _selectedThemeIndex = GetThemeIndex(_service.ThemeName);
+            _selectedCloseBehaviorIndex = _service.CloseBehavior == ApplicationCloseBehavior.MinimizeToTray ? 0 : 1;
 
             ConnectCommand = new RelayCommand(async () => await ConnectAsync());
             InstallDriverCommand = new RelayCommand(ExecuteInstallDriverAsync);
@@ -1797,12 +1830,26 @@ namespace ZeroCue.DataProbe.ViewModels
             LanguageOptions[1] = LocalizationService.Get("LanguageSpanish");
         }
 
+        private void RefreshCloseBehaviorOptions()
+        {
+            if (CloseBehaviorOptions.Count == 0)
+            {
+                CloseBehaviorOptions.Add(LocalizationService.Get("CloseBehaviorMinimize"));
+                CloseBehaviorOptions.Add(LocalizationService.Get("CloseBehaviorExit"));
+                return;
+            }
+
+            CloseBehaviorOptions[0] = LocalizationService.Get("CloseBehaviorMinimize");
+            CloseBehaviorOptions[1] = LocalizationService.Get("CloseBehaviorExit");
+        }
+
         private void ApplyLanguage(string languageCode)
         {
             LocalizationService.SetLanguage(languageCode);
             _service.LanguageCode = languageCode;
             _service.RefreshLocalizedConnectionStatus();
             RefreshLanguageOptions();
+            RefreshCloseBehaviorOptions();
             NotifyLocalizedTextChanged();
         }
 
@@ -2958,6 +3005,15 @@ namespace ZeroCue.DataProbe.ViewModels
             else if (e.PropertyName == nameof(ScufDeviceService.TriggerCurve))
             {
                 NotifyTriggerCurveChanged();
+            }
+            else if (e.PropertyName == nameof(ScufDeviceService.CloseBehavior))
+            {
+                _selectedCloseBehaviorIndex = _service.CloseBehavior == ApplicationCloseBehavior.MinimizeToTray ? 0 : 1;
+                OnPropertyChanged(nameof(SelectedCloseBehaviorIndex));
+            }
+            else if (e.PropertyName == nameof(ScufDeviceService.AskBeforeClosing))
+            {
+                OnPropertyChanged(nameof(AskBeforeClosing));
             }
             else if (e.PropertyName == nameof(ScufDeviceService.StickCurve) ||
                      e.PropertyName == nameof(ScufDeviceService.StickDeadzoneMinPercent) ||

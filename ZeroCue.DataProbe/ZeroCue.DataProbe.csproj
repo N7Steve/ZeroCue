@@ -32,6 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <AvaloniaResource Include="Assets\zerocue.ico" />
     <AvaloniaResource Include="Assets\zerocue_logo_white.png" />
     <AvaloniaResource Include="Assets\gamepad-icons\Keyboard_Mouse\**\*.png" />
     <AvaloniaResource Include="Assets\gamepad-icons\XGamepad\**\*.png" />

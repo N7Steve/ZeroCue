@@ -15,4 +15,22 @@
         <FluentTheme />
         <materialIcons:MaterialIconStyles />
     </Application.Styles>
+
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/zerocue.ico"
+                      ToolTipText="ZeroCue"
+                      Clicked="TrayIcon_Clicked">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="{DynamicResource TrayOpen}"
+                                        Click="TrayOpen_Clicked" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="{DynamicResource TrayExit}"
+                                        Click="TrayExit_Clicked" />
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
 </Application>

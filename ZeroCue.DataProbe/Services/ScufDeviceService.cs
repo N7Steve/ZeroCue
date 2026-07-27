@@ -248,6 +248,34 @@ namespace ZeroCue.DataProbe.Services
             }
         }
 
+        private ApplicationCloseBehavior _closeBehavior = ApplicationCloseBehavior.MinimizeToTray;
+        public ApplicationCloseBehavior CloseBehavior
+        {
+            get => _closeBehavior;
+            set
+            {
+                if (_closeBehavior != value)
+                {
+                    SetProperty(ref _closeBehavior, value);
+                    SaveAppSettings();
+                }
+            }
+        }
+
+        private bool _askBeforeClosing = true;
+        public bool AskBeforeClosing
+        {
+            get => _askBeforeClosing;
+            set
+            {
+                if (_askBeforeClosing != value)
+                {
+                    SetProperty(ref _askBeforeClosing, value);
+                    SaveAppSettings();
+                }
+            }
+        }
+
         private string _defaultProfileName = "Default";
         public string DefaultProfileName
         {

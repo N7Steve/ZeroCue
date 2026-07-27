@@ -11,6 +11,7 @@
         MinWidth="1440" MinHeight="900"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
+        Icon="/Assets/zerocue.ico"
         Background="{DynamicResource AppBackgroundColor}">
 
     <Window.Styles>

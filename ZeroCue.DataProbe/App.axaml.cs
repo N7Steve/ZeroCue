@@ -1,8 +1,10 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using System;
 using ZeroCue.DataProbe.Services;
+
 namespace ZeroCue.DataProbe;
 
 public partial class App : Application
@@ -20,16 +22,50 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            desktop.Exit += (_, _) => service.Disconnect();
+
             var mainWindow = new MainWindow();
             if (WindowsStartupService.ShouldStartMinimized(desktop.Args))
             {
-                mainWindow.WindowState = Avalonia.Controls.WindowState.Minimized;
+                mainWindow.StartHiddenInTray();
             }
 
             desktop.MainWindow = mainWindow;
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    public void ShutdownApplication()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown();
+        }
+    }
+
+    private void TrayIcon_Clicked(object? sender, EventArgs e)
+    {
+        RestoreMainWindow();
+    }
+
+    private void TrayOpen_Clicked(object? sender, EventArgs e)
+    {
+        RestoreMainWindow();
+    }
+
+    private void TrayExit_Clicked(object? sender, EventArgs e)
+    {
+        ShutdownApplication();
+    }
+
+    private void RestoreMainWindow()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { MainWindow: MainWindow mainWindow })
+        {
+            mainWindow.RestoreFromTray();
+        }
     }
 
     public static void ChangeTheme(string themeName)

@@ -34,6 +34,8 @@ Corsair or SCUF Gaming.
 - Face-button, paddle, G-key, keyboard, mouse, macro, and shifted mappings.
 - Per-profile stick curves, deadzones, trigger curves, rumble, RGB, eco mode,
   and automatic application linking.
+- Configurable system tray behavior that keeps remapping active in the
+  background when the main window is hidden.
 - Portable, self-contained Windows x64 build: no separate .NET installation.
 - Two centralized diagnostic logs beside the executable: communication and
   input/mapping activity.

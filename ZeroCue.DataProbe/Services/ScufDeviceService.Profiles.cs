@@ -37,6 +37,8 @@ namespace ZeroCue.DataProbe.Services
                         _themeName = string.IsNullOrWhiteSpace(settings.ThemeName) ? "DefaultTheme" : settings.ThemeName;
                         _startWithWindows = settings.StartWithWindows;
                         _startMinimized = settings.StartMinimized;
+                        _closeBehavior = settings.CloseBehavior;
+                        _askBeforeClosing = settings.AskBeforeClosing;
                         _defaultProfileName = string.IsNullOrWhiteSpace(settings.DefaultProfileName) ? "Default" : settings.DefaultProfileName.Trim();
                         WindowsStartupService.Configure(_startWithWindows, _startMinimized);
                     }
@@ -58,6 +60,8 @@ namespace ZeroCue.DataProbe.Services
                     ThemeName = _themeName,
                     StartWithWindows = _startWithWindows,
                     StartMinimized = _startMinimized,
+                    CloseBehavior = _closeBehavior,
+                    AskBeforeClosing = _askBeforeClosing,
                     DefaultProfileName = _defaultProfileName
                 };
                 var options = new JsonSerializerOptions { WriteIndented = true };

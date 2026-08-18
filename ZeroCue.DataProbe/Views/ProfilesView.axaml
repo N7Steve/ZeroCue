@@ -158,18 +158,40 @@
     <Grid RowDefinitions="Auto,*">
 
         <Border Grid.Row="0" Background="{DynamicResource PanelBackgroundColor}" Padding="30,20" BorderBrush="{DynamicResource BorderColor}" BorderThickness="0,0,0,1" ZIndex="10">
-            <Grid ColumnDefinitions="*,Auto">
-                <StackPanel VerticalAlignment="Center" Spacing="5">
+            <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Row="0" VerticalAlignment="Center" Spacing="5">
                     <TextBlock Text="{DynamicResource ProfilesDashboard}" Foreground="{DynamicResource TextHeaderColor}" FontSize="28" FontWeight="Bold"/>
                     <TextBlock Text="{DynamicResource ProfilesSubtitle}" Foreground="{DynamicResource TextSecondaryColor}" FontSize="14"/>
                 </StackPanel>
 
-                <Button Grid.Column="1" Classes="profilePrimaryButton" Command="{Binding CreateProfileCommand}" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <materialIcons:MaterialIcon Kind="Plus" Width="18" Height="18"/>
-                        <TextBlock Text="{DynamicResource CreateNewProfile}" VerticalAlignment="Center"/>
+                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button Classes="profileSecondaryButton" Click="ImportProfileButton_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <materialIcons:MaterialIcon Kind="Import" Width="18" Height="18"/>
+                            <TextBlock Text="{DynamicResource ImportProfile}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="profilePrimaryButton" Command="{Binding CreateProfileCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <materialIcons:MaterialIcon Kind="Plus" Width="18" Height="18"/>
+                            <TextBlock Text="{DynamicResource CreateNewProfile}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <Border Grid.Row="1"
+                        Grid.ColumnSpan="2"
+                        IsVisible="{Binding HasProfileActionError}"
+                        BorderBrush="{DynamicResource ErrorColor}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12,9"
+                        Margin="0,14,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="9">
+                        <materialIcons:MaterialIcon Kind="AlertCircleOutline" Width="18" Height="18" Foreground="{DynamicResource ErrorColor}" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding ProfileActionError}" Foreground="{DynamicResource ErrorColor}" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center"/>
                     </StackPanel>
-                </Button>
+                </Border>
             </Grid>
         </Border>
 
@@ -221,6 +243,11 @@
                                                             <MenuItem Header="{DynamicResource DuplicateProfile}" Command="{Binding DuplicateProfileCommand}">
                                                                 <MenuItem.Icon>
                                                                     <materialIcons:MaterialIcon Kind="ContentCopy" Width="16" Height="16"/>
+                                                                </MenuItem.Icon>
+                                                            </MenuItem>
+                                                            <MenuItem Header="{DynamicResource ExportProfile}" Click="ExportProfileMenuItem_Click" Tag="{Binding}">
+                                                                <MenuItem.Icon>
+                                                                    <materialIcons:MaterialIcon Kind="Export" Width="16" Height="16"/>
                                                                 </MenuItem.Icon>
                                                             </MenuItem>
                                                             <MenuItem Header="{DynamicResource DeleteProfile}" Command="{Binding DeleteProfileCommand}" IsEnabled="{Binding CanDelete}">

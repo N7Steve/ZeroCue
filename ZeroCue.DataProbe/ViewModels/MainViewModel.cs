@@ -1869,6 +1869,7 @@ namespace ZeroCue.DataProbe.ViewModels
 
         private ProfileItemViewModel? _profileEditorTarget;
         private ProfileItemViewModel? _profileDuplicateSource;
+        private PreparedProfileImport? _pendingProfileImport;
         private ProfileItemViewModel? _pendingProfileActionTarget;
         private ProfileItemViewModel? _managedLinkedAppsProfile;
         private List<string> _pendingLinkedAppPaths = new List<string>();
@@ -2210,6 +2211,60 @@ namespace ZeroCue.DataProbe.ViewModels
             RefreshSelectedProfileCards();
         }
 
+        public void BeginProfileImport(string sourcePath)
+        {
+            ProfileActionError = string.Empty;
+            try
+            {
+                _pendingProfileImport = ProfileTransferService.ReadImport(sourcePath);
+                _profileEditorTarget = null;
+                _profileDuplicateSource = null;
+                string suggestedName = string.IsNullOrWhiteSpace(_pendingProfileImport.SuggestedName)
+                    ? LocalizationService.Get("ImportedProfileDefaultName")
+                    : _pendingProfileImport.SuggestedName;
+                PendingProfileName = GetAvailableProfileName(suggestedName);
+                ProfileEditorError = string.Empty;
+                IsProfileEditorRenameMode = false;
+                ProfileEditorTitle = LocalizationService.Get("ImportProfileTitle");
+                ProfileEditorDescription = LocalizationService.Get("ImportProfileDescription");
+                IsProfileEditorDialogOpen = true;
+            }
+            catch (ProfileImportException ex)
+            {
+                _pendingProfileImport = null;
+                ProfileActionError = GetProfileImportError(ex);
+            }
+            catch (Exception ex)
+            {
+                _pendingProfileImport = null;
+                ProfileActionError = string.Format(LocalizationService.Get("ProfileImportReadFailedFormat"), ex.Message);
+            }
+        }
+
+        public void ExportProfile(ProfileItemViewModel profile, string destinationPath)
+        {
+            ProfileActionError = string.Empty;
+            try
+            {
+                var sourceProfile = _service.TryReadProfile(profile.OriginalName);
+                if (sourceProfile == null)
+                {
+                    ProfileActionError = LocalizationService.Get("ProfileExportSourceMissing");
+                    return;
+                }
+
+                ProfileTransferService.Export(sourceProfile, profile.Name, destinationPath);
+            }
+            catch (ProfileImportException)
+            {
+                ProfileActionError = LocalizationService.Get("ProfileExportInvalid");
+            }
+            catch (Exception ex)
+            {
+                ProfileActionError = string.Format(LocalizationService.Get("ProfileExportFailedFormat"), ex.Message);
+            }
+        }
+
         private void RefreshSelectedProfileCards()
         {
             var canDeleteProfiles = Profiles.Count > 1;
@@ -2237,6 +2292,8 @@ namespace ZeroCue.DataProbe.ViewModels
         {
             _profileEditorTarget = null;
             _profileDuplicateSource = null;
+            _pendingProfileImport = null;
+            ProfileActionError = string.Empty;
             PendingProfileName = GetNextProfileName();
             ProfileEditorError = string.Empty;
             IsProfileEditorRenameMode = false;
@@ -2249,6 +2306,8 @@ namespace ZeroCue.DataProbe.ViewModels
         {
             _profileEditorTarget = vm;
             _profileDuplicateSource = null;
+            _pendingProfileImport = null;
+            ProfileActionError = string.Empty;
             PendingProfileName = vm.Name;
             ProfileEditorError = string.Empty;
             IsProfileEditorRenameMode = true;
@@ -2262,6 +2321,7 @@ namespace ZeroCue.DataProbe.ViewModels
             IsProfileEditorDialogOpen = false;
             _profileEditorTarget = null;
             _profileDuplicateSource = null;
+            _pendingProfileImport = null;
             ProfileEditorError = string.Empty;
         }
 
@@ -2278,6 +2338,29 @@ namespace ZeroCue.DataProbe.ViewModels
 
             if (_profileEditorTarget == null)
             {
+                if (_pendingProfileImport != null)
+                {
+                    try
+                    {
+                        ProfileTransferService.SaveImport(_pendingProfileImport.Profile, requestedName);
+                    }
+                    catch (ProfileImportException)
+                    {
+                        ProfileEditorError = LocalizationService.Get("ProfileImportInvalid");
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        ProfileEditorError = string.Format(LocalizationService.Get("ProfileImportSaveFailedFormat"), ex.Message);
+                        return;
+                    }
+
+                    CloseProfileEditorDialog();
+                    LoadProfilesList(requestedName);
+                    SelectedProfile = requestedName;
+                    return;
+                }
+
                 if (_profileDuplicateSource != null)
                 {
                     CreateProfileDuplicate(_profileDuplicateSource, requestedName);
@@ -2315,7 +2398,10 @@ namespace ZeroCue.DataProbe.ViewModels
                 return LocalizationService.Get("ProfileNameRequired");
             }
 
-            if (profileName.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0)
+            if (profileName.Length > 80
+                || profileName.EndsWith(".", StringComparison.Ordinal)
+                || profileName.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0
+                || IsReservedWindowsFileName(profileName))
             {
                 return LocalizationService.Get("ProfileNameInvalid");
             }
@@ -2350,6 +2436,54 @@ namespace ZeroCue.DataProbe.ViewModels
             }
         }
 
+        private string GetAvailableProfileName(string baseName)
+        {
+            if (!ProfileNameExists(baseName))
+            {
+                return baseName;
+            }
+
+            int suffix = 2;
+            string candidate;
+            do
+            {
+                string suffixText = $" ({suffix})";
+                int baseLength = Math.Min(baseName.Length, 80 - suffixText.Length);
+                candidate = baseName[..baseLength].TrimEnd() + suffixText;
+                suffix++;
+            }
+            while (ProfileNameExists(candidate));
+
+            return candidate;
+        }
+
+        private static bool IsReservedWindowsFileName(string profileName)
+        {
+            string name = profileName.Trim().TrimEnd('.');
+            return name.Equals("CON", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("PRN", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("AUX", StringComparison.OrdinalIgnoreCase)
+                || name.Equals("NUL", StringComparison.OrdinalIgnoreCase)
+                || (name.Length == 4
+                    && (name.StartsWith("COM", StringComparison.OrdinalIgnoreCase)
+                        || name.StartsWith("LPT", StringComparison.OrdinalIgnoreCase))
+                    && name[3] >= '1'
+                    && name[3] <= '9');
+        }
+
+        private static string GetProfileImportError(ProfileImportException exception)
+        {
+            return exception.Failure switch
+            {
+                ProfileImportFailure.TooLarge => LocalizationService.Get("ProfileImportTooLarge"),
+                ProfileImportFailure.UnsupportedVersion => string.Format(
+                    LocalizationService.Get("ProfileImportUnsupportedVersionFormat"),
+                    exception.FormatVersion ?? 0,
+                    ScufProfile.CurrentFormatVersion),
+                _ => LocalizationService.Get("ProfileImportInvalid")
+            };
+        }
+
         private void RenameProfileFile(string oldName, string newName)
         {
             string oldPath = ZeroCuePaths.GetProfileFile(oldName);
@@ -2364,7 +2498,7 @@ namespace ZeroCue.DataProbe.ViewModels
             {
                 renamedProfile.Name = newName;
                 var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-                System.IO.File.WriteAllText(newPath, System.Text.Json.JsonSerializer.Serialize(renamedProfile, options));
+                AtomicFile.WriteAllText(newPath, System.Text.Json.JsonSerializer.Serialize(renamedProfile, options));
             }
         }
 
@@ -2372,6 +2506,8 @@ namespace ZeroCue.DataProbe.ViewModels
         {
             _profileEditorTarget = null;
             _profileDuplicateSource = vm;
+            _pendingProfileImport = null;
+            ProfileActionError = string.Empty;
             PendingProfileName = GetDuplicateProfileName(vm.Name);
             ProfileEditorError = string.Empty;
             IsProfileEditorRenameMode = false;
@@ -2390,7 +2526,7 @@ namespace ZeroCue.DataProbe.ViewModels
 
             sourceProfile.Name = duplicateName;
             var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-            System.IO.File.WriteAllText(
+            AtomicFile.WriteAllText(
                 ZeroCuePaths.GetProfileFile(duplicateName),
                 System.Text.Json.JsonSerializer.Serialize(sourceProfile, options));
         }

@@ -75,15 +75,19 @@ jobs:
           @"
           ZeroCue public alpha for Windows x64.
 
-          This build adds configurable Windows system tray behavior:
+          This build adds portable profile transfer and improves data and USB
+          recovery:
 
-          - Keeps controller remapping active while ZeroCue is hidden in the
-            notification area.
-          - Shows a confirmation dialog when the main window is closed.
-          - Lets you minimize to the tray or exit ZeroCue completely.
-          - Can remember the selected action for future close requests.
-          - Adds close behavior and confirmation controls to Settings.
-          - Restores the main window from the tray icon or its context menu.
+          - Imports and exports versioned controller profiles from the Profiles
+            dashboard, with validation and localized error handling.
+          - Excludes machine-local application links from transferred profiles
+            so shared files do not disclose local paths.
+          - Writes settings, profiles, and driver manifests atomically to reduce
+            the risk of corruption after a crash or power loss.
+          - Reattaches each USB kernel interface independently when a wired
+            controller disconnects, so one failure cannot block the others.
+          - Routes the affected PowerShell and USB diagnostics through English
+            and Spanish localization.
 
           ViGEmBus 1.22.0 must be installed before ZeroCue's WinUSB driver. Driver
           installation is required for the connection mode you use: install the

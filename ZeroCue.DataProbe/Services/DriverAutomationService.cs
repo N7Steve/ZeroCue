@@ -554,9 +554,7 @@ namespace ZeroCue.DataProbe.Services
                 PublishedInfNames = allOwnedPackages
             };
             var options = new JsonSerializerOptions { WriteIndented = true };
-            string temporaryPath = manifestPath + ".tmp";
-            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(manifest, options));
-            File.Move(temporaryPath, manifestPath, overwrite: true);
+            AtomicFile.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, options));
         }
 
         private void DeleteOwnedDriverPackageManifest(DriverTargetConfig config)
@@ -623,6 +621,7 @@ namespace ZeroCue.DataProbe.Services
         {
             try
             {
+                string noInstancesMessage = PowerShellLiteral(LocalizationService.Get("WirelessReceiverInstancesNotFound"));
                 string script =
                     "$devices = Get-PnpDevice | Where-Object {\r\n" +
                     "    ($_.InstanceId -match 'VID_1B1C&PID_3A08') -or\r\n" +
@@ -633,7 +632,7 @@ namespace ZeroCue.DataProbe.Services
                     "if ($devices) {\r\n" +
                     "    $devices | Format-Table -AutoSize | Out-String\r\n" +
                     "} else {\r\n" +
-                    "    Write-Output 'No wireless receiver PnP instances were found.'\r\n" +
+                    $"    Write-Output {noInstancesMessage}\r\n" +
                     "}";
 
                 var psi = new ProcessStartInfo
@@ -659,15 +658,18 @@ namespace ZeroCue.DataProbe.Services
 
                     if (!string.IsNullOrWhiteSpace(error))
                     {
-                        return output + "\nError:\n" + error;
+                        return string.Format(
+                            LocalizationService.Get("PowerShellExecutionErrorFormat"),
+                            output.TrimEnd(),
+                            error.TrimEnd());
                     }
                     return output;
                 }
-                return "No se pudo ejecutar PowerShell.";
+                return LocalizationService.Get("PowerShellLaunchFailed");
             }
             catch (Exception ex)
             {
-                return $"Exception: {ex.Message}";
+                return string.Format(LocalizationService.Get("PowerShellExceptionFormat"), ex.Message);
             }
         }
 

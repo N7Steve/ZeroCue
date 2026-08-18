@@ -394,8 +394,23 @@ namespace ZeroCue.DataProbe.Services
                     try { _device.ReleaseInterface(DATA_IFACE); } catch { }
                     try { _device.ReleaseInterface(HANDSHAKE_IFACE); } catch { }
 
-                    // Also re-attach kernel drivers if possible
-                    try { if (_device.SupportsDetachKernelDriver()) { _device.AttachKernelDriver(0); _device.AttachKernelDriver(DATA_IFACE); _device.AttachKernelDriver(HANDSHAKE_IFACE); } } catch { }
+                    // Re-attach every kernel driver independently so one failed interface
+                    // cannot prevent the remaining interfaces from being restored.
+                    try
+                    {
+                        if (_device.SupportsDetachKernelDriver())
+                        {
+                            TryReattachKernelDriver(0);
+                            TryReattachKernelDriver(DATA_IFACE);
+                            TryReattachKernelDriver(HANDSHAKE_IFACE);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogInput(string.Format(
+                            LocalizationService.Get("KernelDriverCapabilityCheckFailedFormat"),
+                            ex.Message));
+                    }
 
                     _device.Close();
                     if (_device is IDisposable disposableDevice)
@@ -451,6 +466,21 @@ namespace ZeroCue.DataProbe.Services
             finally
             {
                 Interlocked.Exchange(ref _disconnecting, 0);
+            }
+        }
+
+        private void TryReattachKernelDriver(int interfaceId)
+        {
+            try
+            {
+                _device?.AttachKernelDriver(interfaceId);
+            }
+            catch (Exception ex)
+            {
+                LogInput(string.Format(
+                    LocalizationService.Get("KernelDriverReattachFailedFormat"),
+                    interfaceId,
+                    ex.Message));
             }
         }
 

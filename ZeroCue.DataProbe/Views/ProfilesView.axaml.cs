@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using System;
 using System.Linq;
 using ZeroCue.DataProbe.Services;
 using ZeroCue.DataProbe.ViewModels;
@@ -11,6 +12,91 @@ namespace ZeroCue.DataProbe.Views
         public ProfilesView()
         {
             InitializeComponent();
+        }
+
+        private async void ImportProfileButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            if (DataContext is not MainViewModel viewModel)
+            {
+                return;
+            }
+
+            viewModel.ProfileActionError = string.Empty;
+            try
+            {
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel == null)
+                {
+                    return;
+                }
+
+                var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+                {
+                    Title = LocalizationService.Get("ImportProfileDialogTitle"),
+                    AllowMultiple = false,
+                    FileTypeFilter = new[]
+                    {
+                        CreateProfileFileType()
+                    }
+                });
+
+                var selectedFile = files.FirstOrDefault();
+                if (selectedFile != null)
+                {
+                    viewModel.BeginProfileImport(selectedFile.Path.LocalPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                viewModel.ProfileActionError = string.Format(LocalizationService.Get("ProfilePickerFailedFormat"), ex.Message);
+            }
+        }
+
+        private async void ExportProfileMenuItem_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            if (sender is not MenuItem { Tag: ProfileItemViewModel profile }
+                || DataContext is not MainViewModel viewModel)
+            {
+                return;
+            }
+
+            viewModel.ProfileActionError = string.Empty;
+            try
+            {
+                var topLevel = TopLevel.GetTopLevel(this);
+                if (topLevel == null)
+                {
+                    return;
+                }
+
+                var destination = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    Title = LocalizationService.Get("ExportProfileDialogTitle"),
+                    SuggestedFileName = $"{profile.Name}.json",
+                    DefaultExtension = "json",
+                    FileTypeChoices = new[]
+                    {
+                        CreateProfileFileType()
+                    }
+                });
+
+                if (destination != null)
+                {
+                    viewModel.ExportProfile(profile, destination.Path.LocalPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                viewModel.ProfileActionError = string.Format(LocalizationService.Get("ProfilePickerFailedFormat"), ex.Message);
+            }
+        }
+
+        private static FilePickerFileType CreateProfileFileType()
+        {
+            return new FilePickerFileType(LocalizationService.Get("ProfileJsonFiles"))
+            {
+                Patterns = new[] { "*.json" }
+            };
         }
 
         private async void LinkAppButton_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

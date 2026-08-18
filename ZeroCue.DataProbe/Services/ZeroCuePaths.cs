@@ -250,7 +250,7 @@ namespace ZeroCue.DataProbe.Services
         {
             var profile = CreateDefaultProfileTemplate(profileName);
             var options = new JsonSerializerOptions { WriteIndented = true };
-            File.WriteAllText(path, JsonSerializer.Serialize(profile, options));
+            AtomicFile.WriteAllText(path, JsonSerializer.Serialize(profile, options));
         }
 
         private static ScufProfile CreateDefaultProfileTemplate(string profileName)

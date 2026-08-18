@@ -66,7 +66,7 @@ namespace ZeroCue.DataProbe.Services
                 };
                 var options = new JsonSerializerOptions { WriteIndented = true };
                 string json = JsonSerializer.Serialize(settings, options);
-                File.WriteAllText(ZeroCuePaths.AppSettingsFile, json);
+                AtomicFile.WriteAllText(ZeroCuePaths.AppSettingsFile, json);
             }
             catch (Exception ex)
             {
@@ -133,6 +133,7 @@ namespace ZeroCue.DataProbe.Services
                         RgbGreen = profile.RgbGreen;
                         RgbBlue = profile.RgbBlue;
                         RgbBrightness = profile.RgbBrightness;
+                        RumbleIntensity = profile.RumbleIntensity;
                         EcoMode = profile.EcoMode;
                         TriggerCurve = string.IsNullOrWhiteSpace(profile.TriggerCurve) ? "Lineal" : profile.TriggerCurve;
                         CustomCurveX = profile.CustomCurveX ?? new double[] { 0.0, 0.25, 0.5, 0.75, 1.0 };
@@ -394,7 +395,7 @@ namespace ZeroCue.DataProbe.Services
         {
             string path = ZeroCuePaths.GetProfileFile(profileName);
             var options = new JsonSerializerOptions { WriteIndented = true };
-            File.WriteAllText(path, JsonSerializer.Serialize(profile, options));
+            AtomicFile.WriteAllText(path, JsonSerializer.Serialize(profile, options));
         }
 
         public void SaveProfile(string profileName)
@@ -413,6 +414,7 @@ namespace ZeroCue.DataProbe.Services
                     RgbGreen = RgbGreen,
                     RgbBlue = RgbBlue,
                     RgbBrightness = RgbBrightness,
+                    RumbleIntensity = RumbleIntensity,
                     EcoMode = EcoMode,
                     TriggerCurve = TriggerCurve,
                     CustomCurveX = CustomCurveX,
@@ -440,7 +442,7 @@ namespace ZeroCue.DataProbe.Services
                 string json = JsonSerializer.Serialize(profile, options);
 
                 string path = ZeroCuePaths.GetProfileFile(profileName);
-                File.WriteAllText(path, json);
+                AtomicFile.WriteAllText(path, json);
                 LogInput($"[INFO] Perfil '{profileName}' guardado exitosamente.");
             }
             catch (Exception ex)

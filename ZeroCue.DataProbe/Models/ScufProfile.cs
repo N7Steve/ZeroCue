@@ -5,6 +5,9 @@ namespace ZeroCue.DataProbe.Models
 {
     public class ScufProfile
     {
+        public const int CurrentFormatVersion = 1;
+
+        public int FormatVersion { get; set; } = CurrentFormatVersion;
         public string Name { get; set; } = "Default";
         public string LinkedAppPath { get; set; } = string.Empty;
         public List<string> LinkedAppPaths { get; set; } = new List<string>();

@@ -75,20 +75,23 @@ jobs:
           @"
           ZeroCue public alpha for Windows x64.
 
-          This build fixes wireless receiver connection and driver recovery:
+          This build adds an experimental wireless path for the original SCUF
+          PC Controller Dongle while preserving the existing V2 support:
 
-          - Installs WinUSB on receiver interface MI_04 for control traffic and
-            MI_03 for wireless input instead of incorrectly replacing MI_00.
-          - Migrates the incorrect MI_00 binding left by earlier alpha builds,
-            while refusing to remove unrelated or unverified driver packages.
-          - Verifies the receiver's real 64-byte pipes after installation instead
-            of treating a WinUSB service binding alone as success.
-          - Restores original receiver drivers even when the ownership manifest
-            is incomplete, including strictly scoped ZeroCue and Zadig/libwdi
-            packages for the supported SCUF hardware IDs.
-          - Removes duplicate and orphaned receiver packages, rescans the device,
-            and fails restoration if any supported receiver interface remains on
-            WinUSB, allowing iCUE to detect the receiver again.
+          - Detects the experimental V1 dongle as VID_2E95 / PID_434E and installs
+            WinUSB only on MI_04 for control and MI_03 for wireless input.
+          - Never replaces the V1 MI_00 interface or USB composite parent, keeping
+            the official Scufdriver6 binding outside ZeroCue's scope.
+          - Validates the exact V1/V2 receiver's real 64-byte endpoints after
+            installation before attempting the existing V2 wireless protocol.
+          - Automatically rolls back the exact receiver identity if installation
+            is partial or its endpoint topology is incompatible.
+          - Restores only verified ZeroCue or strictly scoped Zadig/libwdi WinUSB
+            packages, then confirms that no selected receiver interface remains
+            on WinUSB so the official SCUF/iCUE drivers can bind again.
+          - Adds receiver variant, experimental status, VID/PID, PnP driver state,
+            endpoints, app version, OS, architecture, and rollback results to the
+            diagnostic logs for this hardware trial.
 
           ViGEmBus 1.22.0 must be installed before ZeroCue's WinUSB driver. Driver
           installation is required for the connection mode you use: install the

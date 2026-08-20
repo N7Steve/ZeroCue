@@ -84,7 +84,8 @@ namespace ZeroCue.DataProbe.Services
                     return null;
                 }
 
-                var isWirelessReceiver = DeviceProfile.IsWirelessReceiver(attrs.VendorID, attrs.ProductID);
+                var receiverIdentity = DeviceProfile.FindWirelessReceiver(attrs.VendorID, attrs.ProductID);
+                var isWirelessReceiver = receiverIdentity != null;
                 var hasPreferredHint = path.IndexOf("mi_04&col02", StringComparison.OrdinalIgnoreCase) >= 0;
                 var hasOutputReport = caps.OutputReportByteLength > 0;
                 var isConsumerControl = caps.UsagePage == 0x000C;
@@ -101,7 +102,7 @@ namespace ZeroCue.DataProbe.Services
                     ? "selected: VID/PID + HID caps match"
                     : BuildRejectReason(isWirelessReceiver, isConsumerControl, hasOutputReport, caps);
 
-                log($"[WIRELESS-HID] candidate transport=HID VID=0x{attrs.VendorID:X4} PID=0x{attrs.ProductID:X4} usagePage=0x{caps.UsagePage:X4} usage=0x{caps.Usage:X4} inputReportLength={caps.InputReportByteLength} outputReportLength={caps.OutputReportByteLength} featureReportLength={caps.FeatureReportByteLength} preferredPathHint={hasPreferredHint} compatible={isCompatible} reason={reason} path={path}");
+                log($"[WIRELESS-HID] candidate transport=HID variant={receiverIdentity?.Variant ?? "unknown"} experimental={receiverIdentity?.IsExperimental ?? false} VID=0x{attrs.VendorID:X4} PID=0x{attrs.ProductID:X4} usagePage=0x{caps.UsagePage:X4} usage=0x{caps.Usage:X4} inputReportLength={caps.InputReportByteLength} outputReportLength={caps.OutputReportByteLength} featureReportLength={caps.FeatureReportByteLength} preferredPathHint={hasPreferredHint} compatible={isCompatible} reason={reason} path={path}");
 
                 return new WirelessHidCandidate(
                     path,
@@ -112,6 +113,8 @@ namespace ZeroCue.DataProbe.Services
                     caps.InputReportByteLength,
                     caps.OutputReportByteLength,
                     caps.FeatureReportByteLength,
+                    receiverIdentity?.Variant ?? "unknown",
+                    receiverIdentity?.IsExperimental ?? false,
                     hasPreferredHint,
                     isCompatible,
                     reason);
@@ -137,10 +140,9 @@ namespace ZeroCue.DataProbe.Services
 
         private static bool PathContainsSupportedWirelessReceiver(string path)
         {
-            var vid = $"vid_{DeviceProfile.VendorId:x4}";
-            return path.IndexOf(vid, StringComparison.OrdinalIgnoreCase) >= 0 &&
-                   DeviceProfile.WirelessReceiverPids.Any(pid =>
-                       path.IndexOf($"pid_{pid:x4}", StringComparison.OrdinalIgnoreCase) >= 0);
+            return DeviceProfile.WirelessReceiverIdentities.Any(identity =>
+                path.IndexOf($"vid_{identity.VendorId:x4}", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                path.IndexOf($"pid_{identity.ProductId:x4}", StringComparison.OrdinalIgnoreCase) >= 0);
         }
 
         private static IEnumerable<string> EnumerateHidPaths(Guid hidGuid)
@@ -263,6 +265,8 @@ namespace ZeroCue.DataProbe.Services
         int InputReportLength,
         int OutputReportLength,
         int FeatureReportLength,
+        string Variant,
+        bool IsExperimental,
         bool PathHasPreferredHint,
         bool IsCompatible,
         string Reason);

@@ -27,6 +27,7 @@ namespace ZeroCue.DataProbe.Services
         private readonly Action<string> _logger;
         private readonly WirelessWinUsbInterfaceTarget _interfaceTarget;
         private readonly bool _logReadPayloads;
+        private readonly WirelessReceiverIdentity? _receiverIdentity;
         private SafeFileHandle? _deviceHandle;
         private IntPtr _winUsbHandle;
         private byte _outPipeId = 0x02;
@@ -38,17 +39,20 @@ namespace ZeroCue.DataProbe.Services
         public WirelessDongleWinUsbTransport(
             Action<string> logger,
             WirelessWinUsbInterfaceTarget interfaceTarget = WirelessWinUsbInterfaceTarget.AnyControl,
-            bool logReadPayloads = true)
+            bool logReadPayloads = true,
+            WirelessReceiverIdentity? receiverIdentity = null)
         {
             _logger = logger;
             _interfaceTarget = interfaceTarget;
             _logReadPayloads = logReadPayloads;
+            _receiverIdentity = receiverIdentity;
         }
 
         public string? DevicePath { get; private set; }
         public IReadOnlyList<WinUsbPipeDescriptor> Pipes { get; private set; } = Array.Empty<WinUsbPipeDescriptor>();
         public long TimeToOpenWinUsbMs { get; private set; }
         public long? TimeToFirstReplayReportMs { get; private set; }
+        public WirelessReceiverIdentity? SelectedReceiverIdentity { get; private set; }
         public Action<byte[], int>? FrameObserver { get; set; }
         public bool IsOpen => _winUsbHandle != IntPtr.Zero && _deviceHandle is { IsInvalid: false, IsClosed: false };
 
@@ -58,30 +62,37 @@ namespace ZeroCue.DataProbe.Services
             _connectClock.Restart();
             _firstWriteLogged = false;
             LogTransport("=== Wireless WinUSB transport connect ===");
-            LogTransport($"Enumerating WinUSB/USB interface candidates profile={DeviceProfile.Name} VID=0x{DeviceProfile.VendorId:X4} PIDs=0x{DeviceProfile.WirelessBasePid:X4}/0x{DeviceProfile.WirelessActivePid:X4} target={_interfaceTarget} requiredControlPipes OUT=0x{DeviceProfile.WinUsbOutPipe:X2} IN=0x{DeviceProfile.WinUsbInPipe:X2} reportSize={DeviceProfile.ReportSize}.");
+            var receiverIdentities = _receiverIdentity == null
+                ? DeviceProfile.WirelessReceiverIdentities
+                : new[] { _receiverIdentity };
+            LogTransport($"Enumerating WinUSB/USB interface candidates profile={DeviceProfile.Name} identities={string.Join(',', receiverIdentities.Select(FormatIdentity))} scope={(_receiverIdentity == null ? "all" : "exact")} target={_interfaceTarget} requiredControlPipes OUT=0x{DeviceProfile.WinUsbOutPipe:X2} IN=0x{DeviceProfile.WinUsbInPipe:X2} reportSize={DeviceProfile.ReportSize}.");
 
-            var candidates = DeviceProfile.WirelessReceiverPids
-                .SelectMany(pid => WinUsbInterop.EnumerateUsbDevicePaths(
-                    $"vid_{DeviceProfile.VendorId:x4}",
-                    $"pid_{pid:x4}",
-                    LogTransport))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(CandidatePriority)
-                .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+            var candidates = receiverIdentities
+                .SelectMany(identity => WinUsbInterop.EnumerateUsbDevicePaths(
+                        $"vid_{identity.VendorId:x4}",
+                        $"pid_{identity.ProductId:x4}",
+                        LogTransport)
+                    .Select(path => new ReceiverCandidate(path, identity)))
+                .GroupBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(candidate => CandidatePriority(candidate.Path))
+                .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             LogTransport($"WinUSB candidate count={candidates.Count}");
-            foreach (var path in candidates)
+            foreach (var candidate in candidates)
             {
                 ct.ThrowIfCancellationRequested();
+                var path = candidate.Path;
                 var (vid, pid) = TryParseVidPid(path);
-                LogTransport($"WinUSB candidate transport=WinUSB VID={FormatNullableHex(vid)} PID={FormatNullableHex(pid)} path={path} priority={CandidatePriority(path)}");
+                LogTransport($"WinUSB candidate transport=WinUSB variant={candidate.Identity.Variant} experimental={candidate.Identity.IsExperimental} VID={FormatNullableHex(vid)} PID={FormatNullableHex(pid)} path={path} priority={CandidatePriority(path)}");
                 if (TryOpenCandidate(path, out var pipes))
                 {
                     DevicePath = path;
                     Pipes = pipes;
+                    SelectedReceiverIdentity = candidate.Identity;
                     TimeToOpenWinUsbMs = _connectClock.ElapsedMilliseconds;
-                    LogTransport($"WinUSB selected path={path}");
+                    LogTransport($"WinUSB selected variant={candidate.Identity.Variant} experimental={candidate.Identity.IsExperimental} identity={FormatIdentity(candidate.Identity)} path={path}");
                     LogTransport($"WinUSB selected pipes OUT=0x{_outPipeId:X2} IN=0x{_inPipeId:X2}");
                     LogTransport($"TimeToOpenWinUsbMs={TimeToOpenWinUsbMs}");
                     return await Task.FromResult(true);
@@ -412,6 +423,7 @@ namespace ZeroCue.DataProbe.Services
             _deviceHandle?.Dispose();
             _deviceHandle = null;
             DevicePath = null;
+            SelectedReceiverIdentity = null;
             Pipes = Array.Empty<WinUsbPipeDescriptor>();
             _outPipeId = 0x02;
             _inPipeId = 0x82;
@@ -438,6 +450,11 @@ namespace ZeroCue.DataProbe.Services
 
         private static string FormatNullableHex(int? value) =>
             value.HasValue ? $"0x{value.Value:X4}" : "<unknown>";
+
+        private static string FormatIdentity(WirelessReceiverIdentity identity) =>
+            $"{identity.Variant}[VID_0x{identity.VendorId:X4},PID_0x{identity.ProductId:X4},experimental={identity.IsExperimental}]";
+
+        private sealed record ReceiverCandidate(string Path, WirelessReceiverIdentity Identity);
     }
 
     public sealed record WinUsbPipeDescriptor(

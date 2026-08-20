@@ -18,9 +18,11 @@ you manage mappings and device settings from a single interface.
 > Hardware compatibility is currently guaranteed only for the SCUF Envision Pro
 > V2. Wired SCUF Envision V2 devices using `VID_1B1C / PID_3A04` are detected as
 > an experimental, unvalidated profile that reuses the Pro V2 protocol. The SCUF
-> Envision Pro V1 has not been tested. ZeroCue is early alpha software: bugs,
-> failed connections, crashes, and unexpected behavior may occur, and reliable
-> operation is not guaranteed.
+> PC Controller Dongle V1 using `VID_2E95 / PID_434E` is also experimental and
+> reuses the V2 wireless protocol only after its WinUSB endpoint topology has
+> been validated. ZeroCue is early alpha software: bugs, failed connections,
+> crashes, and unexpected behavior may occur, and reliable operation is not
+> guaranteed.
 
 ZeroCue is an independent project and is not affiliated with or endorsed by
 Corsair or SCUF Gaming.
@@ -89,6 +91,11 @@ unofficial mirror.
 ZeroCue records the driver packages it installs and its restore option only
 removes verified packages for the selected SCUF controller or receiver. Restoring
 the original driver allows iCUE to detect the device again.
+
+For the experimental `2E95:434E` V1 dongle, ZeroCue modifies only interfaces
+`MI_03` and `MI_04`; it does not replace `MI_00` or the composite parent. If the
+required 64-byte WinUSB endpoints are not present after installation, ZeroCue
+reports the detected topology and starts an exact automatic rollback.
 
 ZeroCue is not required for recovery. You can use Windows Device Manager as an
 administrator, locate only the SCUF controller or receiver interfaces modified by

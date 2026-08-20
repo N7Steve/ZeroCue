@@ -64,7 +64,6 @@ namespace ZeroCue.DataProbe.Services
 
                 string runId = DateTime.Now.ToString("yyyyMMddHHmmss");
                 string tempDirPrefix = Path.Combine(workDir, $"zerocue_wdi_{config.LogName}_{runId}");
-                string targetPidValues = string.Join(",", config.PidValues.Select(PowerShellLiteral));
                 string previouslyOwnedInfValues = string.Join(",", previouslyOwnedPackages.Select(PowerShellLiteral));
 
                 var ps1 = new StringBuilder();
@@ -74,23 +73,46 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("}");
                 ps1.AppendLine("$publishedInfsBefore = @(Get-PublishedInfNames)");
                 ps1.AppendLine($"$knownOwnedInfs = @({previouslyOwnedInfValues})");
-                ps1.AppendLine($"$targetPidValues = @({targetPidValues})");
-                ps1.AppendLine("$selectedPidValue = $null");
-                ps1.AppendLine("foreach ($candidatePidValue in $targetPidValues) {");
-                ps1.AppendLine("    $candidateDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
-                ps1.AppendLine($"        $_.InstanceId -like \"USB\\VID_{config.VidValue}&PID_$candidatePidValue*\"");
-                ps1.AppendLine("    })");
-                ps1.AppendLine("    if ($candidateDevices.Count -gt 0) { $selectedPidValue = $candidatePidValue; break }");
+                ps1.AppendLine("$targets = @(");
+                foreach (var variant in config.Variants)
+                {
+                    foreach (var pidValue in variant.PidValues)
+                    {
+                        string experimental = variant.IsExperimental ? "$true" : "$false";
+                        ps1.AppendLine($"    [pscustomobject]@{{ VidValue={PowerShellLiteral(variant.VidValue)}; Vid={PowerShellLiteral(variant.Vid)}; PidValue={PowerShellLiteral(pidValue)}; Variant={PowerShellLiteral(variant.Name)}; DeviceName={PowerShellLiteral(variant.DeviceName)}; Experimental={experimental} }}");
+                    }
+                }
+                ps1.AppendLine(")");
+                ps1.AppendLine("$supportedIdentities = @($targets | ForEach-Object { 'VID_' + $_.VidValue + '&PID_' + $_.PidValue })");
+                ps1.AppendLine("$selectedTarget = $null");
+                ps1.AppendLine("$selectedDevices = @()");
+                ps1.AppendLine("foreach ($candidateTarget in $targets) {");
+                ps1.AppendLine("    $candidatePattern = \"USB\\VID_$($candidateTarget.VidValue)&PID_$($candidateTarget.PidValue)*\"");
+                ps1.AppendLine("    $candidateDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $candidatePattern })");
+                ps1.AppendLine("    if ($candidateDevices.Count -gt 0) { $selectedTarget = $candidateTarget; $selectedDevices = $candidateDevices; break }");
                 ps1.AppendLine("}");
-                ps1.AppendLine("if ($null -eq $selectedPidValue) {");
-                ps1.AppendLine($"    Write-Output \"No present {config.DisplayName} matched supported PIDs: $($targetPidValues -join ', ').\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine("if ($null -eq $selectedTarget) {");
+                ps1.AppendLine($"    Write-Output \"No present {config.DisplayName} matched supported identities: $($supportedIdentities -join ', ').\" >> {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine($"    Write-Output 'results=' > {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine($"    Write-Output 'packages=' >> {PowerShellLiteral(resultPath)}");
+                ps1.AppendLine($"    Write-Output 'vid=' >> {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine($"    Write-Output 'pid=' >> {PowerShellLiteral(resultPath)}");
+                ps1.AppendLine($"    Write-Output 'variant=' >> {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine("    exit 2");
                 ps1.AppendLine("}");
+                ps1.AppendLine("$selectedVidValue = $selectedTarget.VidValue");
+                ps1.AppendLine("$selectedVid = $selectedTarget.Vid");
+                ps1.AppendLine("$selectedPidValue = $selectedTarget.PidValue");
                 ps1.AppendLine("$selectedPid = \"0x$selectedPidValue\"");
-                ps1.AppendLine($"Write-Output \"Selected VID_{config.VidValue}&PID_$selectedPidValue.\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine("$selectedVariant = $selectedTarget.Variant");
+                ps1.AppendLine("$selectedDeviceName = $selectedTarget.DeviceName");
+                ps1.AppendLine("$selectedExperimental = $selectedTarget.Experimental");
+                ps1.AppendLine($"Write-Output \"Selected variant=$selectedVariant experimental=$selectedExperimental VID_$selectedVidValue&PID_$selectedPidValue.\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine("foreach ($device in $selectedDevices | Sort-Object InstanceId) {");
+                ps1.AppendLine("    $driverInf = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data");
+                ps1.AppendLine("    $hardwareIds = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_HardwareIds' -ErrorAction SilentlyContinue).Data -join ';'");
+                ps1.AppendLine($"    Write-Output \"PnP before install instance=$($device.InstanceId) status=$($device.Status) class=$($device.Class) service=$($device.Service) driverInf=$driverInf hardwareIds=$hardwareIds\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine("}");
                 ps1.AppendLine("Write-Host '=======================================' -ForegroundColor Cyan");
                 ps1.AppendLine($"Write-Host '  Installing WinUSB: {config.DisplayName}' -ForegroundColor Cyan");
                 ps1.AppendLine("Write-Host '=======================================' -ForegroundColor Cyan");
@@ -102,11 +124,14 @@ namespace ZeroCue.DataProbe.Services
                 AppendObsoleteBindingMigrationScript(ps1, config, wdiLog);
                 ps1.AppendLine("Write-Host 'Installing drivers... Accept any Windows security prompts that appear.' -ForegroundColor Yellow");
 
-                foreach (var bindingSuffix in config.Bindings
-                    .Select(binding => binding.InterfaceId is int id ? $"mi{id}" : "device")
-                    .Distinct(StringComparer.OrdinalIgnoreCase))
+                foreach (var variant in config.Variants)
                 {
-                    ps1.AppendLine($"New-Item -ItemType Directory -Force -Path {PowerShellLiteral($"{tempDirPrefix}_{bindingSuffix}")} | Out-Null");
+                    foreach (var bindingSuffix in variant.Bindings
+                        .Select(binding => binding.InterfaceId is int id ? $"mi{id}" : "device")
+                        .Distinct(StringComparer.OrdinalIgnoreCase))
+                    {
+                        ps1.AppendLine($"New-Item -ItemType Directory -Force -Path {PowerShellLiteral($"{tempDirPrefix}_{variant.Key}_{bindingSuffix}")} | Out-Null");
+                    }
                 }
 
                 ps1.AppendLine("function Install-WdiDriver {");
@@ -118,7 +143,7 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("    try {");
                 ps1.AppendLine("        $wdiOut = Join-Path -Path $tempDir -ChildPath 'wdi_out.log'");
                 ps1.AppendLine("        $wdiErr = Join-Path -Path $tempDir -ChildPath 'wdi_err.log'");
-                ps1.AppendLine($"        $argsArray = @('-n', {PowerShellLiteral(config.DeviceName)}, '-v', {PowerShellLiteral(config.Vid)}, '-p', $selectedPid)");
+                ps1.AppendLine("        $argsArray = @('-n', $selectedDeviceName, '-v', $selectedVid, '-p', $selectedPid)");
                 ps1.AppendLine("        if ($interfaceId -ge 0) { $argsArray += @('-i', $interfaceId) }");
                 ps1.AppendLine("        $argsArray += @('-t', '0', '-s', '-o', '15000', '-d', $tempDir)");
                 ps1.AppendLine($"        $proc = Start-Process -FilePath {PowerShellLiteral(wdiPath)} -ArgumentList $argsArray -PassThru -NoNewWindow -RedirectStandardOutput $wdiOut -RedirectStandardError $wdiErr");
@@ -126,9 +151,9 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("        $waited = 0");
                 ps1.AppendLine("        $miHex = '{0:X2}' -f $interfaceId");
                 ps1.AppendLine("        $targetInstancePattern = if ($interfaceId -ge 0) {");
-                ps1.AppendLine($"            \"USB\\VID_{config.VidValue}&PID_$selectedPidValue&MI_$miHex\\*\"");
+                ps1.AppendLine("            \"USB\\VID_$selectedVidValue&PID_$selectedPidValue&MI_$miHex\\*\"");
                 ps1.AppendLine("        } else {");
-                ps1.AppendLine($"            \"USB\\VID_{config.VidValue}&PID_$selectedPidValue\\*\"");
+                ps1.AppendLine("            \"USB\\VID_$selectedVidValue&PID_$selectedPidValue\\*\"");
                 ps1.AppendLine("        }");
                 ps1.AppendLine("        while (-not $proc.HasExited -and $waited -lt $maxWait) {");
                 ps1.AppendLine("            Start-Sleep -Seconds 3");
@@ -177,14 +202,17 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("}");
 
                 ps1.AppendLine("$resultCodes = @()");
-                foreach (var binding in config.Bindings)
+                foreach (var variant in config.Variants)
                 {
-                    int interfaceId = binding.InterfaceId ?? -1;
-                    string bindingSuffix = binding.InterfaceId is int id ? $"mi{id}" : "device";
-                    ps1.AppendLine($"if ($selectedPidValue -eq {PowerShellLiteral(binding.PidValue)}) {{");
-                    ps1.AppendLine($"    $resultCodes += Install-WdiDriver -tempDir {PowerShellLiteral($"{tempDirPrefix}_{bindingSuffix}")} -interfaceId {interfaceId} -miString {PowerShellLiteral(binding.Name)}");
-                    ps1.AppendLine("    Start-Sleep -Seconds 4");
-                    ps1.AppendLine("}");
+                    foreach (var binding in variant.Bindings)
+                    {
+                        int interfaceId = binding.InterfaceId ?? -1;
+                        string bindingSuffix = binding.InterfaceId is int id ? $"mi{id}" : "device";
+                        ps1.AppendLine($"if ($selectedVidValue -eq {PowerShellLiteral(variant.VidValue)} -and $selectedPidValue -eq {PowerShellLiteral(binding.PidValue)}) {{");
+                        ps1.AppendLine($"    $resultCodes += Install-WdiDriver -tempDir {PowerShellLiteral($"{tempDirPrefix}_{variant.Key}_{bindingSuffix}")} -interfaceId {interfaceId} -miString {PowerShellLiteral(binding.Name)}");
+                        ps1.AppendLine("    Start-Sleep -Seconds 4");
+                        ps1.AppendLine("}");
+                    }
                 }
                 ps1.AppendLine("if ($migrationFailures -gt 0) { $resultCodes += -1 }");
 
@@ -194,11 +222,20 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("foreach ($infName in $createdInfs) {");
                 ps1.AppendLine("    $infPath = Join-Path (Join-Path $env:windir 'INF') $infName");
                 ps1.AppendLine("    $content = Get-Content -LiteralPath $infPath -Raw -ErrorAction SilentlyContinue");
-                ps1.AppendLine($"    if ($content -match 'ZeroCue' -and $content -match \"VID_{config.VidValue}&PID_$selectedPidValue\") {{ $ownedInfs += $infName }}");
+                ps1.AppendLine("    if ($content -match 'ZeroCue' -and $content -match \"VID_$selectedVidValue&PID_$selectedPidValue\") { $ownedInfs += $infName }");
+                ps1.AppendLine("}");
+                ps1.AppendLine("$selectedPattern = \"USB\\VID_$selectedVidValue&PID_$selectedPidValue*\"");
+                ps1.AppendLine("$afterDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $selectedPattern })");
+                ps1.AppendLine("foreach ($device in $afterDevices | Sort-Object InstanceId) {");
+                ps1.AppendLine("    $driverInf = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data");
+                ps1.AppendLine($"    Write-Output \"PnP after install instance=$($device.InstanceId) status=$($device.Status) class=$($device.Class) service=$($device.Service) driverInf=$driverInf\" >> {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine("}");
                 ps1.AppendLine($"Write-Output \"results=$($resultCodes -join ',')\" > {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine($"Write-Output \"packages=$($ownedInfs -join ',')\" >> {PowerShellLiteral(resultPath)}");
+                ps1.AppendLine($"Write-Output \"vid=$selectedVidValue\" >> {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine($"Write-Output \"pid=$selectedPidValue\" >> {PowerShellLiteral(resultPath)}");
+                ps1.AppendLine($"Write-Output \"variant=$selectedVariant\" >> {PowerShellLiteral(resultPath)}");
+                ps1.AppendLine($"Write-Output \"experimental=$selectedExperimental\" >> {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine(BuildCorsairRestartScript());
                 ps1.AppendLine("Write-Host '=======================================' -ForegroundColor Cyan");
                 ps1.AppendLine("if ($resultCodes.Count -gt 0 -and $resultCodes -notcontains -1) {");
@@ -219,6 +256,11 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("exit 0");
                 File.WriteAllText(ps1Path, ps1.ToString());
                 Log($"Created {config.LogName} install script at: {ps1Path}");
+                if (!ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} install"))
+                {
+                    preserveDiagnostics = true;
+                    return false;
+                }
 
                 var psi = new ProcessStartInfo
                 {
@@ -248,18 +290,42 @@ namespace ZeroCue.DataProbe.Services
                         .Where(IsPublishedInfName)
                         .ToArray();
 
-                    SaveOwnedDriverPackages(config, newlyOwnedPackages);
-                    Log($"{config.LogName} install results: {string.Join(",", resultCodes)}; owned packages: {string.Join(",", newlyOwnedPackages)}");
+                    string selectedVid = result.TryGetValue("vid", out var vidValue) ? vidValue : string.Empty;
                     string selectedPid = result.TryGetValue("pid", out var pidValue) ? pidValue : string.Empty;
-                    int expectedResultCount = config.Bindings.Count(binding =>
-                        string.Equals(binding.PidValue, selectedPid, StringComparison.OrdinalIgnoreCase));
+                    string selectedVariantName = result.TryGetValue("variant", out var variantValue) ? variantValue : string.Empty;
+                    var selectedVariant = config.FindVariant(selectedVid, selectedPid);
+                    Log($"{config.LogName} install results: variant={selectedVariantName} VID=0x{selectedVid} PID=0x{selectedPid} results={string.Join(",", resultCodes)} ownedPackages={string.Join(",", newlyOwnedPackages)}");
+                    int expectedResultCount = selectedVariant?.Bindings.Count(binding =>
+                        string.Equals(binding.PidValue, selectedPid, StringComparison.OrdinalIgnoreCase)) ?? 0;
                     bool success = expectedResultCount > 0 &&
                         resultCodes.Length == expectedResultCount &&
                         resultCodes.All(code => code == "0");
-                    if (success && target == DriverTarget.Receiver &&
-                        string.Equals(selectedPid, "3A08", StringComparison.OrdinalIgnoreCase))
+                    bool requiresReceiverTopologyValidation = target == DriverTarget.Receiver &&
+                        selectedVariant?.Bindings.Any(binding => binding.InterfaceId == 4) == true &&
+                        selectedVariant.Bindings.Any(binding => binding.InterfaceId == 3);
+                    if (success && requiresReceiverTopologyValidation)
                     {
-                        success = await ValidateReceiverWinUsbTopologyAsync();
+                        success = await ValidateReceiverWinUsbTopologyAsync(selectedVid, selectedPid, selectedVariant!);
+                    }
+
+                    if (success)
+                    {
+                        SaveOwnedDriverPackages(config, newlyOwnedPackages);
+                    }
+                    else if (target == DriverTarget.Receiver && selectedVariant != null && resultCodes.Length > 0)
+                    {
+                        var scopedConfig = config.ScopeToIdentity(selectedVid, selectedPid);
+                        Log($"Receiver install failed validation or completed partially for {selectedVariant.Name} VID=0x{selectedVid} PID=0x{selectedPid}; starting exact automatic rollback.");
+                        bool rollbackSuccess = await RestoreDriverConfigAsync(
+                            scopedConfig,
+                            newlyOwnedPackages,
+                            deleteManifestOnSuccess: false,
+                            operationName: "automatic rollback");
+                        Log($"Receiver automatic rollback result={rollbackSuccess} variant={selectedVariant.Name} VID=0x{selectedVid} PID=0x{selectedPid}.");
+                        if (!rollbackSuccess)
+                        {
+                            SaveOwnedDriverPackages(config, newlyOwnedPackages);
+                        }
                     }
                     preserveDiagnostics = !success;
                     return success;
@@ -303,44 +369,47 @@ namespace ZeroCue.DataProbe.Services
             ps1.AppendLine("$migrationFailures = 0");
             ps1.AppendLine("$migrationPerformed = $false");
 
-            foreach (var binding in config.ObsoleteBindings)
+            foreach (var variant in config.Variants)
             {
-                string miHex = binding.InterfaceId.ToString("X2");
-                string hardwareId = $"VID_{config.VidValue}&PID_{binding.PidValue}&MI_{miHex}";
-                string requiredBindingPattern = $"VID_{config.VidValue}&PID_{binding.PidValue}&MI_(03|04)";
-                ps1.AppendLine($"if ($selectedPidValue -eq {PowerShellLiteral(binding.PidValue)}) {{");
-                ps1.AppendLine($"    $obsoletePattern = {PowerShellLiteral($"USB\\{hardwareId}\\*")}");
-                ps1.AppendLine("    $obsoleteDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $obsoletePattern })");
-                ps1.AppendLine("    foreach ($obsoleteDevice in $obsoleteDevices) {");
-                ps1.AppendLine("        if ($obsoleteDevice.Service -notmatch 'WINUSB') { continue }");
-                ps1.AppendLine("        $driverInf = (Get-PnpDeviceProperty -InstanceId $obsoleteDevice.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data");
-                ps1.AppendLine("        $infPath = if ($driverInf -match '^oem[0-9]+\\.inf$') { Join-Path (Join-Path $env:windir 'INF') $driverInf } else { $null }");
-                ps1.AppendLine("        $content = if ($infPath -and (Test-Path -LiteralPath $infPath -PathType Leaf)) { Get-Content -LiteralPath $infPath -Raw -ErrorAction SilentlyContinue } else { '' }");
-                ps1.AppendLine($"        $hasExactHardwareId = $content -match [regex]::Escape({PowerShellLiteral(hardwareId)})");
-                ps1.AppendLine("        $isWinUsbPackage = $content -match 'AddService\\s*=\\s*WinUSB'");
-                ps1.AppendLine("        $isManifestOwned = $knownOwnedInfs -contains $driverInf");
-                ps1.AppendLine("        $isZeroCueOwned = $content -match 'ZeroCue'");
-                ps1.AppendLine("        $hasLegacyIdentity = $content -match '(?im)^\\s*DeviceName\\s*=\\s*\"SCUF\"\\s*$' -and $content -match '(?im)^\\s*SourceName\\s*=\\s*\"SCUF Install Disk\"\\s*$' -and $content -match '(?im)^\\s*Provider\\s*=\\s*\"libwdi\"\\s*$'");
-                ps1.AppendLine("        $hasScopedZadigIdentity = $content -match '(?im)^\\s*DeviceName\\s*=\\s*\"SCUF[^\"]+\"\\s*$' -and $content -match '(?im)^\\s*VendorName\\s*=\\s*\"Corsair\"\\s*$' -and $content -match '(?im)^\\s*SourceName\\s*=\\s*\"SCUF[^\"]+ Install Disk\"\\s*$' -and $content -match '(?im)^\\s*Provider\\s*=\\s*\"libwdi\"\\s*$' -and $content -match '(?im)^\\s*Class\\s*=\\s*\"USBDevice\"\\s*$' -and $content -match '(?im)^\\s*DriverVer\\s*=\\s*06/02/2012,\\s*6\\.1\\.7600\\.16385\\s*$'");
-                ps1.AppendLine($"        $containsRequiredReceiverBinding = $content -match {PowerShellLiteral(requiredBindingPattern)}");
-                ps1.AppendLine("        $isVerifiedObsoletePackage = $hasExactHardwareId -and $isWinUsbPackage -and -not $containsRequiredReceiverBinding -and (($isManifestOwned -and $isZeroCueOwned) -or $isZeroCueOwned -or $hasLegacyIdentity -or $hasScopedZadigIdentity)");
-                ps1.AppendLine("        if (-not $isVerifiedObsoletePackage) {");
-                ps1.AppendLine($"            Write-Output \"Refusing to remove unverified obsolete WinUSB binding $($obsoleteDevice.InstanceId) package=$driverInf.\" >> {PowerShellLiteral(wdiLog)}");
-                ps1.AppendLine("            $migrationFailures++");
-                ps1.AppendLine("            continue");
-                ps1.AppendLine("        }");
-                ps1.AppendLine($"        Write-Output \"Repairing obsolete WinUSB binding $($obsoleteDevice.InstanceId) package=$driverInf.\" >> {PowerShellLiteral(wdiLog)}");
-                ps1.AppendLine("        $removeOutput = & pnputil.exe /remove-device $obsoleteDevice.InstanceId 2>&1");
-                ps1.AppendLine("        $removeExitCode = $LASTEXITCODE");
-                ps1.AppendLine($"        $removeOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
-                ps1.AppendLine("        if ($removeExitCode -ne 0) { $migrationFailures++; continue }");
-                ps1.AppendLine("        $migrationPerformed = $true");
-                ps1.AppendLine("        $deleteOutput = & pnputil.exe /delete-driver $driverInf /uninstall /force 2>&1");
-                ps1.AppendLine("        $deleteExitCode = $LASTEXITCODE");
-                ps1.AppendLine($"        $deleteOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
-                ps1.AppendLine("        if ($deleteExitCode -ne 0) { $migrationFailures++; continue }");
-                ps1.AppendLine("    }");
-                ps1.AppendLine("}");
+                foreach (var binding in variant.ObsoleteBindings)
+                {
+                    string miHex = binding.InterfaceId.ToString("X2");
+                    string hardwareId = $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{miHex}";
+                    string requiredBindingPattern = $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_(03|04)";
+                    ps1.AppendLine($"if ($selectedVidValue -eq {PowerShellLiteral(variant.VidValue)} -and $selectedPidValue -eq {PowerShellLiteral(binding.PidValue)}) {{");
+                    ps1.AppendLine($"    $obsoletePattern = {PowerShellLiteral($"USB\\{hardwareId}\\*")}");
+                    ps1.AppendLine("    $obsoleteDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $obsoletePattern })");
+                    ps1.AppendLine("    foreach ($obsoleteDevice in $obsoleteDevices) {");
+                    ps1.AppendLine("        if ($obsoleteDevice.Service -notmatch 'WINUSB') { continue }");
+                    ps1.AppendLine("        $driverInf = (Get-PnpDeviceProperty -InstanceId $obsoleteDevice.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data");
+                    ps1.AppendLine("        $infPath = if ($driverInf -match '^oem[0-9]+\\.inf$') { Join-Path (Join-Path $env:windir 'INF') $driverInf } else { $null }");
+                    ps1.AppendLine("        $content = if ($infPath -and (Test-Path -LiteralPath $infPath -PathType Leaf)) { Get-Content -LiteralPath $infPath -Raw -ErrorAction SilentlyContinue } else { '' }");
+                    ps1.AppendLine($"        $hasExactHardwareId = $content -match [regex]::Escape({PowerShellLiteral(hardwareId)})");
+                    ps1.AppendLine("        $isWinUsbPackage = $content -match 'AddService\\s*=\\s*WinUSB'");
+                    ps1.AppendLine("        $isManifestOwned = $knownOwnedInfs -contains $driverInf");
+                    ps1.AppendLine("        $isZeroCueOwned = $content -match 'ZeroCue'");
+                    ps1.AppendLine("        $hasLegacyIdentity = $content -match '(?im)^\\s*DeviceName\\s*=\\s*\"SCUF\"\\s*$' -and $content -match '(?im)^\\s*SourceName\\s*=\\s*\"SCUF Install Disk\"\\s*$' -and $content -match '(?im)^\\s*Provider\\s*=\\s*\"libwdi\"\\s*$'");
+                    ps1.AppendLine("        $hasScopedZadigIdentity = $content -match '(?im)^\\s*DeviceName\\s*=\\s*\"SCUF[^\"]+\"\\s*$' -and $content -match '(?im)^\\s*VendorName\\s*=\\s*\"Corsair\"\\s*$' -and $content -match '(?im)^\\s*SourceName\\s*=\\s*\"SCUF[^\"]+ Install Disk\"\\s*$' -and $content -match '(?im)^\\s*Provider\\s*=\\s*\"libwdi\"\\s*$' -and $content -match '(?im)^\\s*Class\\s*=\\s*\"USBDevice\"\\s*$' -and $content -match '(?im)^\\s*DriverVer\\s*=\\s*06/02/2012,\\s*6\\.1\\.7600\\.16385\\s*$'");
+                    ps1.AppendLine($"        $containsRequiredReceiverBinding = $content -match {PowerShellLiteral(requiredBindingPattern)}");
+                    ps1.AppendLine("        $isVerifiedObsoletePackage = $hasExactHardwareId -and $isWinUsbPackage -and -not $containsRequiredReceiverBinding -and (($isManifestOwned -and $isZeroCueOwned) -or $isZeroCueOwned -or $hasLegacyIdentity -or $hasScopedZadigIdentity)");
+                    ps1.AppendLine("        if (-not $isVerifiedObsoletePackage) {");
+                    ps1.AppendLine($"            Write-Output \"Refusing to remove unverified obsolete WinUSB binding $($obsoleteDevice.InstanceId) package=$driverInf.\" >> {PowerShellLiteral(wdiLog)}");
+                    ps1.AppendLine("            $migrationFailures++");
+                    ps1.AppendLine("            continue");
+                    ps1.AppendLine("        }");
+                    ps1.AppendLine($"        Write-Output \"Repairing obsolete WinUSB binding $($obsoleteDevice.InstanceId) package=$driverInf.\" >> {PowerShellLiteral(wdiLog)}");
+                    ps1.AppendLine("        $removeOutput = & pnputil.exe /remove-device $obsoleteDevice.InstanceId 2>&1");
+                    ps1.AppendLine("        $removeExitCode = $LASTEXITCODE");
+                    ps1.AppendLine($"        $removeOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
+                    ps1.AppendLine("        if ($removeExitCode -ne 0) { $migrationFailures++; continue }");
+                    ps1.AppendLine("        $migrationPerformed = $true");
+                    ps1.AppendLine("        $deleteOutput = & pnputil.exe /delete-driver $driverInf /uninstall /force 2>&1");
+                    ps1.AppendLine("        $deleteExitCode = $LASTEXITCODE");
+                    ps1.AppendLine($"        $deleteOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
+                    ps1.AppendLine("        if ($deleteExitCode -ne 0) { $migrationFailures++; continue }");
+                    ps1.AppendLine("    }");
+                    ps1.AppendLine("}");
+                }
             }
 
             ps1.AppendLine("if ($migrationPerformed) {");
@@ -349,17 +418,37 @@ namespace ZeroCue.DataProbe.Services
             ps1.AppendLine("}");
         }
 
-        private async Task<bool> ValidateReceiverWinUsbTopologyAsync()
+        private async Task<bool> ValidateReceiverWinUsbTopologyAsync(
+            string vidValue,
+            string pidValue,
+            DriverHardwareVariant driverVariant)
         {
+            if (!int.TryParse(vidValue, System.Globalization.NumberStyles.HexNumber, null, out var vid) ||
+                !int.TryParse(pidValue, System.Globalization.NumberStyles.HexNumber, null, out var pid))
+            {
+                Log($"Receiver driver validation failed: invalid selected identity VID=0x{vidValue} PID=0x{pidValue}.");
+                return false;
+            }
+
+            var receiverIdentity = SupportedScufDeviceProfile.ScufEnvisionPro.FindWirelessReceiver(vid, pid);
+            if (receiverIdentity == null)
+            {
+                Log($"Receiver driver validation failed: selected identity VID=0x{vid:X4} PID=0x{pid:X4} is not in the runtime receiver profile.");
+                return false;
+            }
+
+            Log($"Receiver topology validation start variant={driverVariant.Name} runtimeVariant={receiverIdentity.Variant} experimental={receiverIdentity.IsExperimental} VID=0x{vid:X4} PID=0x{pid:X4}.");
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             using var runtimeTransport = new WirelessDongleWinUsbTransport(
                 message => Log($"receiver validation: {message}"),
                 WirelessWinUsbInterfaceTarget.RuntimeMi04,
-                logReadPayloads: false);
+                logReadPayloads: false,
+                receiverIdentity: receiverIdentity);
             using var radioTransport = new WirelessDongleWinUsbTransport(
                 message => Log($"receiver validation: {message}"),
                 WirelessWinUsbInterfaceTarget.RadioMi03,
-                logReadPayloads: false);
+                logReadPayloads: false,
+                receiverIdentity: receiverIdentity);
 
             try
             {
@@ -375,7 +464,7 @@ namespace ZeroCue.DataProbe.Services
                     return false;
                 }
 
-                Log("Receiver driver validation succeeded for MI_04 control and MI_03 input pipes.");
+                Log($"Receiver driver validation succeeded variant={receiverIdentity.Variant} experimental={receiverIdentity.IsExperimental} VID=0x{vid:X4} PID=0x{pid:X4} for MI_04 control and MI_03 input pipes.");
                 return true;
             }
             catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is TimeoutException || ex is OperationCanceledException)
@@ -390,12 +479,24 @@ namespace ZeroCue.DataProbe.Services
             }
         }
 
-        private async Task<bool> RestoreDefaultDriversAsync(DriverTarget target)
+        private Task<bool> RestoreDefaultDriversAsync(DriverTarget target)
         {
             var config = DriverTargetConfig.For(target);
             var ownedPackages = LoadOwnedDriverPackages(config);
             Log($"Loaded {ownedPackages.Count} owned driver package(s) for {config.LogName} restore; elevated restore will also discover strictly scoped compatible WinUSB packages.");
+            return RestoreDriverConfigAsync(
+                config,
+                ownedPackages,
+                deleteManifestOnSuccess: true,
+                operationName: "restore");
+        }
 
+        private async Task<bool> RestoreDriverConfigAsync(
+            DriverTargetConfig config,
+            IReadOnlyList<string> ownedPackages,
+            bool deleteManifestOnSuccess,
+            string operationName)
+        {
             string workDir = Path.Combine(Path.GetTempPath(), "ZeroCue", "driver", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(workDir);
 
@@ -410,7 +511,11 @@ namespace ZeroCue.DataProbe.Services
                 string ps1Content = BuildRestoreDriverScript(config, ownedPackages, resultPath);
 
                 File.WriteAllText(ps1Path, ps1Content);
-                Log($"Created {config.LogName} restore script at: {ps1Path}");
+                Log($"Created {config.LogName} {operationName} script at: {ps1Path}; identities={string.Join(',', config.HardwareIdentityValues)} packages={string.Join(',', ownedPackages)}");
+                if (!ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} {operationName}"))
+                {
+                    return false;
+                }
 
                 var psi = new ProcessStartInfo
                 {
@@ -429,7 +534,7 @@ namespace ZeroCue.DataProbe.Services
                 if (process != null)
                 {
                     await process.WaitForExitAsync();
-                    Log($"{config.LogName} restore script ExitCode: {process.ExitCode}");
+                    Log($"{config.LogName} {operationName} script ExitCode: {process.ExitCode}");
                 }
 
                 if (File.Exists(resultPath))
@@ -438,8 +543,8 @@ namespace ZeroCue.DataProbe.Services
                     bool success = result.TryGetValue("success", out var successValue) &&
                         bool.TryParse(successValue, out var parsedSuccess) &&
                         parsedSuccess;
-                    Log($"{config.LogName} restore results: {string.Join("; ", result.Select(pair => $"{pair.Key}={pair.Value}"))}");
-                    if (success)
+                    Log($"{config.LogName} {operationName} results: {string.Join("; ", result.Select(pair => $"{pair.Key}={pair.Value}"))}");
+                    if (success && deleteManifestOnSuccess)
                     {
                         DeleteOwnedDriverPackageManifest(config);
                     }
@@ -447,7 +552,7 @@ namespace ZeroCue.DataProbe.Services
                     return success;
                 }
 
-                Log($"{config.LogName} restore result file not found");
+                Log($"{config.LogName} {operationName} result file not found");
                 return false;
             }
             catch (Win32Exception ex)
@@ -472,13 +577,14 @@ namespace ZeroCue.DataProbe.Services
             string resultPath)
         {
             var ownedInfArray = string.Join(",", ownedPackages.Select(PowerShellLiteral));
-            var targetPidArray = string.Join(",", config.RestorePidValues.Select(pid => PowerShellLiteral($"PID_{pid}")));
-            var legacyHardwareIdArray = string.Join(",", config.Bindings
-                .Select(binding => binding.InterfaceId is int interfaceId
-                    ? $"VID_{config.VidValue}&PID_{binding.PidValue}&MI_{interfaceId:X2}"
-                    : $"VID_{config.VidValue}&PID_{binding.PidValue}")
-                .Concat(config.ObsoleteBindings.Select(binding =>
-                    $"VID_{config.VidValue}&PID_{binding.PidValue}&MI_{binding.InterfaceId:X2}"))
+            var targetHardwareIdArray = string.Join(",", config.HardwareIdentityValues.Select(PowerShellLiteral));
+            var legacyHardwareIdArray = string.Join(",", config.Variants
+                .SelectMany(variant => variant.Bindings
+                    .Select(binding => binding.InterfaceId is int interfaceId
+                        ? $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{interfaceId:X2}"
+                        : $"VID_{variant.VidValue}&PID_{binding.PidValue}")
+                    .Concat(variant.ObsoleteBindings.Select(binding =>
+                        $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{binding.InterfaceId:X2}")))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(PowerShellLiteral));
             return
@@ -486,8 +592,7 @@ namespace ZeroCue.DataProbe.Services
                 "Start-Sleep -Seconds 3\r\n" +
                 $"$ownedInfs = @({ownedInfArray})\r\n" +
                 $"$legacyHardwareIds = @({legacyHardwareIdArray})\r\n" +
-                $"$targetVid = 'VID_{config.VidValue}'\r\n" +
-                $"$targetPids = @({targetPidArray})\r\n" +
+                $"$targetHardwareIds = @({targetHardwareIdArray})\r\n" +
                 "$verifiedInfs = @()\r\n" +
                 "$removedCount = 0\r\n" +
                 "$removedDeviceCount = 0\r\n" +
@@ -497,8 +602,12 @@ namespace ZeroCue.DataProbe.Services
                 "$targetDevices = @(Get-PnpDevice -ErrorAction SilentlyContinue | Where-Object {\r\n" +
                 "    $instanceId = $_.InstanceId\r\n" +
                 "    $hasTargetId = $false\r\n" +
-                "    foreach ($targetPid in $targetPids) { if ($instanceId -match [regex]::Escape(\"$targetVid&$targetPid\")) { $hasTargetId = $true; break } }\r\n" +
+                "    foreach ($targetHardwareId in $targetHardwareIds) { if ($instanceId -match [regex]::Escape($targetHardwareId)) { $hasTargetId = $true; break } }\r\n" +
                 "    $hasTargetId\r\n" +
+                "})\r\n" +
+                "$initialState = @($targetDevices | Sort-Object InstanceId | ForEach-Object {\r\n" +
+                "    $driverInf = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data\r\n" +
+                "    \"instance=$($_.InstanceId);status=$($_.Status);class=$($_.Class);service=$($_.Service);driverInf=$driverInf\"\r\n" +
                 "})\r\n" +
                 "$initialWinUsbDevices = @($targetDevices | Where-Object { $_.Service -match 'WINUSB' })\r\n" +
                 "$legacyCandidates = @(Get-ChildItem -Path (Join-Path $env:windir 'INF\\oem*.inf') -File -ErrorAction SilentlyContinue)\r\n" +
@@ -533,7 +642,7 @@ namespace ZeroCue.DataProbe.Services
                 "    if (-not (Test-Path -LiteralPath $infPath -PathType Leaf)) { $missingCount++; continue }\r\n" +
                 "    $content = Get-Content -LiteralPath $infPath -Raw -ErrorAction SilentlyContinue\r\n" +
                 "    $hasTargetId = $false\r\n" +
-                "    foreach ($targetPid in $targetPids) { if ($content -match [regex]::Escape(\"$targetVid&$targetPid\")) { $hasTargetId = $true; break } }\r\n" +
+                "    foreach ($targetHardwareId in $targetHardwareIds) { if ($content -match [regex]::Escape($targetHardwareId)) { $hasTargetId = $true; break } }\r\n" +
                 "    if ($content -notmatch 'ZeroCue' -or -not $hasTargetId) {\r\n" +
                 "        Write-Warning \"Refusing unverified driver package $infName\"\r\n" +
                 "        $failureCount++\r\n" +
@@ -566,7 +675,7 @@ namespace ZeroCue.DataProbe.Services
                 "    $remainingWinUsbDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {\r\n" +
                 "        $instanceId = $_.InstanceId\r\n" +
                 "        $hasTargetId = $false\r\n" +
-                "        foreach ($targetPid in $targetPids) { if ($instanceId -match [regex]::Escape(\"$targetVid&$targetPid\")) { $hasTargetId = $true; break } }\r\n" +
+                "        foreach ($targetHardwareId in $targetHardwareIds) { if ($instanceId -match [regex]::Escape($targetHardwareId)) { $hasTargetId = $true; break } }\r\n" +
                 "        $hasTargetId -and $_.Service -match 'WINUSB'\r\n" +
                 "    })\r\n" +
                 "    if ($remainingWinUsbDevices.Count -eq 0) { break }\r\n" +
@@ -575,6 +684,16 @@ namespace ZeroCue.DataProbe.Services
                 "    Write-Warning \"WinUSB is still bound to: $($remainingWinUsbDevices.InstanceId -join ', ')\"\r\n" +
                 "    $failureCount += $remainingWinUsbDevices.Count\r\n" +
                 "}\r\n" +
+                "$finalDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {\r\n" +
+                "    $instanceId = $_.InstanceId\r\n" +
+                "    $hasTargetId = $false\r\n" +
+                "    foreach ($targetHardwareId in $targetHardwareIds) { if ($instanceId -match [regex]::Escape($targetHardwareId)) { $hasTargetId = $true; break } }\r\n" +
+                "    $hasTargetId\r\n" +
+                "})\r\n" +
+                "$finalState = @($finalDevices | Sort-Object InstanceId | ForEach-Object {\r\n" +
+                "    $driverInf = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data\r\n" +
+                "    \"instance=$($_.InstanceId);status=$($_.Status);class=$($_.Class);service=$($_.Service);driverInf=$driverInf\"\r\n" +
+                "})\r\n" +
                 "Stop-Process -Name 'wdi-simple' -Force -ErrorAction SilentlyContinue\r\n" +
                 "Stop-Process -Name 'installer_x64' -Force -ErrorAction SilentlyContinue\r\n" +
                 BuildCorsairRestartScript() +
@@ -585,7 +704,9 @@ namespace ZeroCue.DataProbe.Services
                 $"Write-Output \"missing=$missingCount\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"failures=$failureCount\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"packages=$($verifiedInfs -join ',')\" >> {PowerShellLiteral(resultPath)}\r\n" +
-                $"Write-Output \"remaining=$($remainingWinUsbDevices.InstanceId -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n";
+                $"Write-Output \"remaining=$($remainingWinUsbDevices.InstanceId -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
+                $"Write-Output \"before=$($initialState -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
+                $"Write-Output \"after=$($finalState -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n";
         }
 
         private static Dictionary<string, string> ParseKeyValueResult(string path)
@@ -621,6 +742,60 @@ namespace ZeroCue.DataProbe.Services
                 int.TryParse(value[3..^4], out _);
         }
 
+        private bool ValidatePowerShellScriptSyntax(string scriptPath, string operationName)
+        {
+            string parserCommand =
+                "$tokens=$null; $errors=$null; " +
+                $"[System.Management.Automation.Language.Parser]::ParseFile({PowerShellLiteral(scriptPath)},[ref]$tokens,[ref]$errors) | Out-Null; " +
+                "if ($errors.Count -gt 0) { $errors | ForEach-Object { [Console]::Error.WriteLine($_.Message) }; exit 1 }";
+
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                psi.ArgumentList.Add("-NoProfile");
+                psi.ArgumentList.Add("-NonInteractive");
+                psi.ArgumentList.Add("-Command");
+                psi.ArgumentList.Add(parserCommand);
+
+                using var process = Process.Start(psi);
+                if (process == null)
+                {
+                    Log($"PowerShell syntax validation could not start for {operationName}.");
+                    return false;
+                }
+
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+                if (!process.WaitForExit(10_000))
+                {
+                    try { process.Kill(entireProcessTree: true); } catch { }
+                    Log($"PowerShell syntax validation timed out for {operationName}.");
+                    return false;
+                }
+
+                if (process.ExitCode != 0)
+                {
+                    Log($"PowerShell syntax validation failed for {operationName}: {error.Trim()} {output.Trim()}".TrimEnd());
+                    return false;
+                }
+
+                Log($"PowerShell syntax validation succeeded for {operationName}.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log($"PowerShell syntax validation failed to run for {operationName}: {ex.Message}");
+                return false;
+            }
+        }
+
         private string GetDriverPackageManifestPath(DriverTargetConfig config)
         {
             return Path.Combine(ZeroCuePaths.UserDataRoot, "driver-manifests", $"{config.LogName}.json");
@@ -637,14 +812,23 @@ namespace ZeroCue.DataProbe.Services
             try
             {
                 var manifest = JsonSerializer.Deserialize<DriverPackageManifest>(File.ReadAllText(manifestPath));
-                var expectedPids = config.RestorePidValues.ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var manifestPids = manifest?.PidValues?.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var expectedHardwareIds = config.HardwareIdentityValues.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var manifestHardwareIds = manifest?.HardwareIds?
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if ((manifestHardwareIds == null || manifestHardwareIds.Count == 0) &&
+                    manifest != null &&
+                    !string.IsNullOrWhiteSpace(manifest.VidValue))
+                {
+                    manifestHardwareIds = manifest.PidValues
+                        .Select(pid => $"VID_{manifest.VidValue}&PID_{pid}")
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                }
                 bool identityMatches = manifest != null &&
                     string.Equals(manifest.Target, config.LogName, StringComparison.Ordinal) &&
-                    string.Equals(manifest.VidValue, config.VidValue, StringComparison.OrdinalIgnoreCase) &&
-                    manifestPids != null &&
-                    manifestPids.Count > 0 &&
-                    manifestPids.IsSubsetOf(expectedPids);
+                    manifestHardwareIds != null &&
+                    manifestHardwareIds.Count > 0 &&
+                    manifestHardwareIds.IsSubsetOf(expectedHardwareIds);
 
                 if (!identityMatches)
                 {
@@ -689,8 +873,9 @@ namespace ZeroCue.DataProbe.Services
             var manifest = new DriverPackageManifest
             {
                 Target = config.LogName,
-                VidValue = config.VidValue,
-                PidValues = config.RestorePidValues,
+                HardwareIds = config.HardwareIdentityValues,
+                VidValue = config.Variants.Length == 1 ? config.Variants[0].VidValue : string.Empty,
+                PidValues = config.Variants.SelectMany(variant => variant.PidValues).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
                 PublishedInfNames = allOwnedPackages
             };
             var options = new JsonSerializerOptions { WriteIndented = true };
@@ -765,10 +950,14 @@ namespace ZeroCue.DataProbe.Services
                 string script =
                     "$devices = Get-PnpDevice | Where-Object {\r\n" +
                     "    ($_.InstanceId -match 'VID_1B1C&PID_3A08') -or\r\n" +
-                    "    ($_.InstanceId -match 'VID_1B1C&PID_3A09')\r\n" +
+                    "    ($_.InstanceId -match 'VID_1B1C&PID_3A09') -or\r\n" +
+                    "    ($_.InstanceId -match 'VID_2E95&PID_434E')\r\n" +
                     "} | Where-Object {\r\n" +
                     "    $_.InstanceId -notmatch 'PID_3A05'\r\n" +
-                    "} | Select-Object InstanceId, Status, Class\r\n" +
+                    "} | ForEach-Object {\r\n" +
+                    "    $driverInf = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data\r\n" +
+                    "    [pscustomobject]@{ InstanceId=$_.InstanceId; Status=$_.Status; Class=$_.Class; Service=$_.Service; DriverInf=$driverInf; FriendlyName=$_.FriendlyName }\r\n" +
+                    "}\r\n" +
                     "if ($devices) {\r\n" +
                     "    $devices | Format-Table -AutoSize | Out-String\r\n" +
                     "} else {\r\n" +
@@ -818,6 +1007,7 @@ namespace ZeroCue.DataProbe.Services
             public string Target { get; init; } = string.Empty;
             public string VidValue { get; init; } = string.Empty;
             public string[] PidValues { get; init; } = Array.Empty<string>();
+            public string[] HardwareIds { get; init; } = Array.Empty<string>();
             public string[] PublishedInfNames { get; init; } = Array.Empty<string>();
         }
 
@@ -837,11 +1027,12 @@ namespace ZeroCue.DataProbe.Services
             public string PidValue => Pid.Replace("0x", "", StringComparison.OrdinalIgnoreCase);
         }
 
-        private sealed record DriverTargetConfig(
-            string LogName,
-            string DisplayName,
+        private sealed record DriverHardwareVariant(
+            string Key,
+            string Name,
             string DeviceName,
             string Vid,
+            bool IsExperimental,
             DriverBinding[] Bindings,
             ObsoleteDriverBinding[] ObsoleteBindings)
         {
@@ -850,7 +1041,41 @@ namespace ZeroCue.DataProbe.Services
                 .Select(binding => binding.PidValue)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            public string[] RestorePidValues => PidValues;
+
+            public DriverHardwareVariant ScopeToPid(string pidValue) => this with
+            {
+                Bindings = Bindings
+                    .Where(binding => string.Equals(binding.PidValue, pidValue, StringComparison.OrdinalIgnoreCase))
+                    .ToArray(),
+                ObsoleteBindings = ObsoleteBindings
+                    .Where(binding => string.Equals(binding.PidValue, pidValue, StringComparison.OrdinalIgnoreCase))
+                    .ToArray()
+            };
+        }
+
+        private sealed record DriverTargetConfig(
+            string LogName,
+            string DisplayName,
+            DriverHardwareVariant[] Variants)
+        {
+            public string[] HardwareIdentityValues => Variants
+                .SelectMany(variant => variant.PidValues.Select(pid => $"VID_{variant.VidValue}&PID_{pid}"))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            public DriverTargetConfig ScopeToIdentity(string vidValue, string pidValue) => this with
+            {
+                Variants = Variants
+                    .Where(variant => string.Equals(variant.VidValue, vidValue, StringComparison.OrdinalIgnoreCase))
+                    .Select(variant => variant.ScopeToPid(pidValue))
+                    .Where(variant => variant.Bindings.Length > 0)
+                    .ToArray()
+            };
+
+            public DriverHardwareVariant? FindVariant(string vidValue, string pidValue) =>
+                Variants.FirstOrDefault(variant =>
+                    string.Equals(variant.VidValue, vidValue, StringComparison.OrdinalIgnoreCase) &&
+                    variant.PidValues.Contains(pidValue, StringComparer.OrdinalIgnoreCase));
 
             public static DriverTargetConfig For(DriverTarget target)
             {
@@ -859,33 +1084,59 @@ namespace ZeroCue.DataProbe.Services
                     DriverTarget.Receiver => new DriverTargetConfig(
                         "receiver",
                         "SCUF RF receiver",
-                        "ZeroCue SCUF Envision Pro Receiver",
-                        "0x1B1C",
                         new[]
                         {
-                            new DriverBinding("0x3A08", 4, "interface 4 (MI_04)"),
-                            new DriverBinding("0x3A08", 3, "interface 3 (MI_03)"),
-                            new DriverBinding("0x3A09", null, "active receiver device")
-                        },
-                        new[]
-                        {
-                            new ObsoleteDriverBinding("0x3A08", 0, "obsolete interface 0 (MI_00)")
+                            new DriverHardwareVariant(
+                                "v2",
+                                "Envision Pro Wireless USB Receiver V2",
+                                "ZeroCue SCUF Envision Pro Receiver V2",
+                                "0x1B1C",
+                                false,
+                                new[]
+                                {
+                                    new DriverBinding("0x3A08", 4, "V2 interface 4 (MI_04)"),
+                                    new DriverBinding("0x3A08", 3, "V2 interface 3 (MI_03)"),
+                                    new DriverBinding("0x3A09", null, "V2 active receiver device")
+                                },
+                                new[]
+                                {
+                                    new ObsoleteDriverBinding("0x3A08", 0, "obsolete V2 interface 0 (MI_00)")
+                                }),
+                            new DriverHardwareVariant(
+                                "v1",
+                                "SCUF PC Controller Dongle V1",
+                                "ZeroCue SCUF PC Controller Dongle V1",
+                                "0x2E95",
+                                true,
+                                new[]
+                                {
+                                    new DriverBinding("0x434E", 4, "experimental V1 interface 4 (MI_04)"),
+                                    new DriverBinding("0x434E", 3, "experimental V1 interface 3 (MI_03)")
+                                },
+                                Array.Empty<ObsoleteDriverBinding>())
                         }),
                     _ => new DriverTargetConfig(
                         "gamepad",
                         "SCUF Envision wired controller",
-                        "ZeroCue SCUF Envision Wired",
-                        "0x1B1C",
                         new[]
                         {
-                            new DriverBinding("0x3A05", 0, "interface 0 (MI_00)"),
-                            new DriverBinding("0x3A05", 4, "interface 4 (MI_04)"),
-                            new DriverBinding("0x3A05", 3, "interface 3 (MI_03)"),
-                            new DriverBinding("0x3A04", 0, "interface 0 (MI_00)"),
-                            new DriverBinding("0x3A04", 4, "interface 4 (MI_04)"),
-                            new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")
-                        },
-                        Array.Empty<ObsoleteDriverBinding>())
+                            new DriverHardwareVariant(
+                                "wired-v2",
+                                "SCUF Envision wired controller",
+                                "ZeroCue SCUF Envision Wired",
+                                "0x1B1C",
+                                false,
+                                new[]
+                                {
+                                    new DriverBinding("0x3A05", 0, "interface 0 (MI_00)"),
+                                    new DriverBinding("0x3A05", 4, "interface 4 (MI_04)"),
+                                    new DriverBinding("0x3A05", 3, "interface 3 (MI_03)"),
+                                    new DriverBinding("0x3A04", 0, "interface 0 (MI_00)"),
+                                    new DriverBinding("0x3A04", 4, "interface 4 (MI_04)"),
+                                    new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")
+                                },
+                                Array.Empty<ObsoleteDriverBinding>())
+                        })
                 };
             }
         }

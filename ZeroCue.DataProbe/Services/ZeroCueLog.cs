@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace ZeroCue.DataProbe.Services
@@ -115,8 +117,14 @@ namespace ZeroCue.DataProbe.Services
 
         private static void WriteHeader(StreamWriter writer, string title)
         {
+            var assembly = typeof(ZeroCueLog).Assembly;
+            string version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? assembly.GetName().Version?.ToString()
+                ?? "unknown";
             writer.WriteLine($"=== {title} ===");
             writer.WriteLine($"=== Session started: {DateTimeOffset.Now:O} ===");
+            writer.WriteLine($"=== Version: {version} ===");
+            writer.WriteLine($"=== Environment: {RuntimeInformation.OSDescription}; process={RuntimeInformation.ProcessArchitecture}; framework={RuntimeInformation.FrameworkDescription} ===");
         }
     }
 }

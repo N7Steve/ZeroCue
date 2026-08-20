@@ -133,7 +133,8 @@ namespace ZeroCue.DataProbe.Services
                     }
 
                     lastPath = runtimeTransport.DevicePath;
-                    Log($"Handshake attempt={attempts} runtimePath={runtimeTransport.DevicePath}");
+                    var selectedReceiverIdentity = runtimeTransport.SelectedReceiverIdentity;
+                    Log($"Handshake attempt={attempts} receiverVariant={selectedReceiverIdentity?.Variant ?? "unknown"} experimental={selectedReceiverIdentity?.IsExperimental ?? false} identity={(selectedReceiverIdentity == null ? "unknown" : $"VID_0x{selectedReceiverIdentity.VendorId:X4}:PID_0x{selectedReceiverIdentity.ProductId:X4}")} runtimePath={runtimeTransport.DevicePath}");
 
                     try
                     {
@@ -141,7 +142,8 @@ namespace ZeroCue.DataProbe.Services
                         radioTransport = new WirelessDongleWinUsbTransport(
                             Log,
                             WirelessWinUsbInterfaceTarget.RadioMi03,
-                            logReadPayloads: false);
+                            logReadPayloads: false,
+                            receiverIdentity: selectedReceiverIdentity);
                         if (await radioTransport.ConnectAsync(ct))
                         {
                             radioPumpCts = new CancellationTokenSource();
@@ -324,7 +326,7 @@ namespace ZeroCue.DataProbe.Services
                     ? "Max aggressive WinUSB attempts reached."
                     : "Global aggressive WinUSB timeout reached.";
                 Log($"WirelessWinUsbAggressiveSessionProbe failed: {error}");
-                Log("Recommendation: rollback receiver PnP instances for VID_1B1C PID_3A08/PID_3A09 and restart Windows if the receiver keeps reenumerating badly.");
+                Log("Recommendation: use ZeroCue receiver driver restoration for the exact detected identity (VID_1B1C PID_3A08/PID_3A09 or experimental VID_2E95 PID_434E) and restart Windows if the receiver keeps reenumerating badly.");
 
                 return new WirelessWinUsbAggressiveSessionProbeResult
                 {

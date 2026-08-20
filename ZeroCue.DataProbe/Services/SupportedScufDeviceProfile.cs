@@ -1,7 +1,14 @@
+using System;
 using System.Linq;
 
 namespace ZeroCue.DataProbe.Services
 {
+    public sealed record WirelessReceiverIdentity(
+        int VendorId,
+        int ProductId,
+        string Variant,
+        bool IsExperimental);
+
     public sealed record SupportedScufDeviceProfile
     {
         public required string Name { get; init; }
@@ -29,9 +36,16 @@ namespace ZeroCue.DataProbe.Services
         public int[] WiredPids => new[] { WiredPid }.Concat(ExperimentalWiredPids).ToArray();
 
         public bool IsWirelessReceiver(int vendorId, int productId) =>
-            vendorId == VendorId && (productId == WirelessBasePid || productId == WirelessActivePid);
+            WirelessReceiverIdentities.Any(identity =>
+                identity.VendorId == vendorId && identity.ProductId == productId);
+
+        public WirelessReceiverIdentity? FindWirelessReceiver(int vendorId, int productId) =>
+            WirelessReceiverIdentities.FirstOrDefault(identity =>
+                identity.VendorId == vendorId && identity.ProductId == productId);
 
         public int[] WirelessReceiverPids => new[] { WirelessBasePid, WirelessActivePid };
+
+        public WirelessReceiverIdentity[] WirelessReceiverIdentities { get; init; } = Array.Empty<WirelessReceiverIdentity>();
 
         public static SupportedScufDeviceProfile ScufEnvisionPro { get; } = new()
         {
@@ -49,7 +63,13 @@ namespace ZeroCue.DataProbe.Services
             InitCommandChannel = 0x08,
             InitAckChannel = 0x00,
             RuntimeCommandChannel = 0x09,
-            RuntimeAckChannel = 0x01
+            RuntimeAckChannel = 0x01,
+            WirelessReceiverIdentities = new[]
+            {
+                new WirelessReceiverIdentity(0x1B1C, 0x3A08, "Envision Pro Wireless USB Receiver V2 (base)", false),
+                new WirelessReceiverIdentity(0x1B1C, 0x3A09, "Envision Pro Wireless USB Receiver V2 (active)", false),
+                new WirelessReceiverIdentity(0x2E95, 0x434E, "SCUF PC Controller Dongle V1", true)
+            }
         };
     }
 }

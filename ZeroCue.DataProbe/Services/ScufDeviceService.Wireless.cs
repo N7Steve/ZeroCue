@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Nefarius.ViGEm.Client;
@@ -41,7 +42,7 @@ namespace ZeroCue.DataProbe.Services
             {
                 if (!autoConnect)
                 {
-                    LogInput("[WIRELESS-WINUSB] Buscando receiver WinUSB 1B1C:3A08/3A09 con OUT 0x02 / IN 0x82 y MaxPacketSize=64...");
+                    LogInput($"[WIRELESS-WINUSB] Buscando receiver WinUSB compatible identities={string.Join(',', DeviceProfile.WirelessReceiverIdentities.Select(identity => $"{identity.VendorId:X4}:{identity.ProductId:X4}{(identity.IsExperimental ? "[experimental]" : string.Empty)}"))} con OUT 0x02 / IN 0x82 y MaxPacketSize=64...");
                     WirelessHidDetectionService.ScanSupportedReceiverCollections(LogInput);
                 }
 

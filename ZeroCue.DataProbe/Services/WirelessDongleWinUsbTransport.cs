@@ -30,8 +30,8 @@ namespace ZeroCue.DataProbe.Services
         private readonly WirelessReceiverIdentity? _receiverIdentity;
         private SafeFileHandle? _deviceHandle;
         private IntPtr _winUsbHandle;
-        private byte _outPipeId = 0x02;
-        private byte _inPipeId = 0x82;
+        private byte _outPipeId;
+        private byte _inPipeId;
         private bool _disposed;
         private readonly Stopwatch _connectClock = new();
         private bool _firstWriteLogged;
@@ -66,8 +66,9 @@ namespace ZeroCue.DataProbe.Services
                 ? DeviceProfile.WirelessReceiverIdentities
                 : new[] { _receiverIdentity };
             string requiredPipes = _interfaceTarget == WirelessWinUsbInterfaceTarget.RadioMi03
-                ? "IN=0x81 (OUT=0x01 optional)"
-                : $"OUT=0x{DeviceProfile.WinUsbOutPipe:X2} IN=0x{DeviceProfile.WinUsbInPipe:X2}";
+                ? "dedicated radio IN=0x81 (OUT=0x01 optional)"
+                : string.Join(" or ", receiverIdentities.Select(identity =>
+                    $"{identity.VendorId:X4}:{identity.ProductId:X4}=OUT 0x{identity.ControlOutPipe:X2}/IN 0x{identity.ControlInPipe:X2}"));
             LogTransport($"Enumerating WinUSB/USB interface candidates profile={DeviceProfile.Name} identities={string.Join(',', receiverIdentities.Select(FormatIdentity))} scope={(_receiverIdentity == null ? "all" : "exact")} target={_interfaceTarget} requiredPipes={requiredPipes} reportSize={DeviceProfile.ReportSize}.");
 
             var enumeratedCandidates = receiverIdentities
@@ -98,7 +99,7 @@ namespace ZeroCue.DataProbe.Services
                 var path = candidate.Path;
                 var (vid, pid) = TryParseVidPid(path);
                 LogTransport($"WinUSB candidate transport=WinUSB variant={candidate.Identity.Variant} experimental={candidate.Identity.IsExperimental} VID={FormatNullableHex(vid)} PID={FormatNullableHex(pid)} path={path} priority={CandidatePriority(path)}");
-                if (TryOpenCandidate(path, out var pipes))
+                if (TryOpenCandidate(path, candidate.Identity, out var pipes))
                 {
                     DevicePath = path;
                     Pipes = pipes;
@@ -121,7 +122,8 @@ namespace ZeroCue.DataProbe.Services
         {
             if (!candidate.Identity.UsesCompositeInterfaces)
             {
-                return true;
+                return _interfaceTarget != WirelessWinUsbInterfaceTarget.RadioMi03 &&
+                    candidate.Identity.UsesUnifiedActiveTransport;
             }
 
             return _interfaceTarget switch
@@ -339,7 +341,10 @@ namespace ZeroCue.DataProbe.Services
             DisposeHandles();
         }
 
-        private bool TryOpenCandidate(string path, out IReadOnlyList<WinUsbPipeDescriptor> pipes)
+        private bool TryOpenCandidate(
+            string path,
+            WirelessReceiverIdentity identity,
+            out IReadOnlyList<WinUsbPipeDescriptor> pipes)
         {
             pipes = Array.Empty<WinUsbPipeDescriptor>();
             DisposeHandles();
@@ -391,26 +396,30 @@ namespace ZeroCue.DataProbe.Services
                 LogTransport($"WinUSB pipe index={i} id=0x{pipe.PipeId:X2} type={pipe.PipeType} maxPacket={pipe.MaximumPacketSize} interval={pipe.Interval}");
             }
 
-            var hasOut02 = foundPipes.Any(p => p.PipeId == DeviceProfile.WinUsbOutPipe && p.MaximumPacketSize == DeviceProfile.ReportSize);
-            var hasIn82 = foundPipes.Any(p => p.PipeId == DeviceProfile.WinUsbInPipe && p.MaximumPacketSize == DeviceProfile.ReportSize);
+            var hasControlOut = foundPipes.Any(p => p.PipeId == identity.ControlOutPipe && p.MaximumPacketSize == DeviceProfile.ReportSize);
+            var hasControlIn = foundPipes.Any(p => p.PipeId == identity.ControlInPipe && p.MaximumPacketSize == DeviceProfile.ReportSize);
             var hasOut01 = foundPipes.Any(p => p.PipeId == 0x01 && p.MaximumPacketSize == ReportLength);
             var hasIn81 = foundPipes.Any(p => p.PipeId == 0x81 && p.MaximumPacketSize == ReportLength);
 
-            if (_interfaceTarget == WirelessWinUsbInterfaceTarget.RadioMi03 && hasIn81)
+            if (_interfaceTarget == WirelessWinUsbInterfaceTarget.RadioMi03 &&
+                identity.UsesDedicatedRadioInterface &&
+                hasIn81)
             {
                 _outPipeId = hasOut01 ? (byte)0x01 : (byte)0x00;
                 _inPipeId = 0x81;
                 LogTransport($"WinUSB auxiliary input pipe selection OK interface={descriptor.bInterfaceNumber} OUT={(hasOut01 ? "0x01" : "<none>")} IN=0x81 MaxPacketSize=64. Used for read-only radio frames; interface number was not required.");
             }
-            else if ((_interfaceTarget == WirelessWinUsbInterfaceTarget.RuntimeMi04 || _interfaceTarget == WirelessWinUsbInterfaceTarget.AnyControl) && hasOut02 && hasIn82)
+            else if ((_interfaceTarget == WirelessWinUsbInterfaceTarget.RuntimeMi04 || _interfaceTarget == WirelessWinUsbInterfaceTarget.AnyControl) &&
+                hasControlOut &&
+                hasControlIn)
             {
-                _outPipeId = DeviceProfile.WinUsbOutPipe;
-                _inPipeId = DeviceProfile.WinUsbInPipe;
-                LogTransport($"WinUSB pipe selection OK interface={descriptor.bInterfaceNumber} OUT=0x{_outPipeId:X2} IN=0x{_inPipeId:X2} MaxPacketSize={DeviceProfile.ReportSize}. Selected by pipes, not interface number.");
+                _outPipeId = identity.ControlOutPipe;
+                _inPipeId = identity.ControlInPipe;
+                LogTransport($"WinUSB pipe selection OK interface={descriptor.bInterfaceNumber} OUT=0x{_outPipeId:X2} IN=0x{_inPipeId:X2} MaxPacketSize={DeviceProfile.ReportSize} topology={(identity.UsesUnifiedActiveTransport ? "unified-active" : "dual-interface")}. Selected by identity topology and pipes, not interface number.");
             }
             else
             {
-                LogTransport($"WinUSB pipe selection rejected target={_interfaceTarget} hasOut02={hasOut02} hasIn82={hasIn82} hasOut01={hasOut01} hasIn81={hasIn81} reason={(hasOut02 || hasIn82 ? "incomplete required pipe pair" : "required control pipes not present")}");
+                LogTransport($"WinUSB pipe selection rejected target={_interfaceTarget} identity={FormatIdentity(identity)} requiredOut=0x{identity.ControlOutPipe:X2} requiredIn=0x{identity.ControlInPipe:X2} hasRequiredOut={hasControlOut} hasRequiredIn={hasControlIn} hasOut01={hasOut01} hasIn81={hasIn81} reason={(hasControlOut || hasControlIn ? "incomplete required pipe pair" : "required control pipes not present")}");
                 DisposeHandles();
                 return false;
             }
@@ -481,7 +490,7 @@ namespace ZeroCue.DataProbe.Services
             value.HasValue ? $"0x{value.Value:X4}" : "<unknown>";
 
         private static string FormatIdentity(WirelessReceiverIdentity identity) =>
-            $"{identity.Variant}[VID_0x{identity.VendorId:X4},PID_0x{identity.ProductId:X4},experimental={identity.IsExperimental},composite={identity.UsesCompositeInterfaces}]";
+            $"{identity.Variant}[VID_0x{identity.VendorId:X4},PID_0x{identity.ProductId:X4},experimental={identity.IsExperimental},composite={identity.UsesCompositeInterfaces},control=0x{identity.ControlOutPipe:X2}/0x{identity.ControlInPipe:X2},dedicatedRadio={identity.UsesDedicatedRadioInterface}]";
 
         private sealed record ReceiverCandidate(string Path, WirelessReceiverIdentity Identity);
     }

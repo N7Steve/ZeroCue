@@ -96,16 +96,23 @@ For the experimental V1 dongle, ZeroCue treats `2E95:434E` as its composite base
 state and modifies only interfaces `MI_03` and `MI_04`; it does not replace
 `MI_00` or the composite parent. The observed `2E95:5046` identity is treated as
 the experimental active state and follows the same whole-device model as the V2
-active receiver. If the required 64-byte WinUSB endpoints are not immediately
-available after installation, ZeroCue restarts and rescans the composite
-interfaces or active whole-device binding as applicable, waits for the new device paths, and retries
-validation. If validation still fails, ZeroCue reports the detected topology and
-starts an exact automatic rollback. Recovery also waits for every previously
-present interface to return on its original driver before reporting success.
-Installation diagnostics include present and phantom vendor PnP nodes, parent and
-problem-code properties, WinUSB binding readiness, rescan output, and the final
-`wdi-simple` output. Automatic rollback also records a complete PowerShell and
-`pnputil` transcript in the communication log.
+active receiver. Both observed active identities (`1B1C:3A09` and `2E95:5046`)
+use one unified 64-byte WinUSB transport on `OUT 0x01` / `IN 0x81`; ZeroCue keeps
+one reader on that shared ACK/input endpoint. Base identities continue to use
+`MI_04` (`0x02` / `0x82`) for control and `MI_03` (`IN 0x81`) for input.
+
+If the required WinUSB endpoints are not immediately available after
+installation, ZeroCue removes and rescans only the exact base `MI_03` device node
+to force Windows to publish its new WinUSB interface, while restarting the other
+selected binding normally. Active whole-device bindings are restarted directly.
+Validation and diagnostics use bounded retries and timeouts. If validation still
+fails, ZeroCue reports the detected topology and starts an exact automatic
+rollback. Recovery also waits for every previously present interface to return on
+its original driver before reporting success. Installation diagnostics include
+present and phantom vendor PnP nodes, parent and problem-code properties, WinUSB
+binding readiness, bounded rescan output, and the final `wdi-simple` output.
+Automatic rollback also records a complete PowerShell and `pnputil` transcript in
+the communication log.
 
 ZeroCue is not required for recovery. You can use Windows Device Manager as an
 administrator, locate only the SCUF controller or receiver interfaces modified by

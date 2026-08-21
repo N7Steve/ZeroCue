@@ -125,8 +125,8 @@ namespace ZeroCue.DataProbe.Services
 
                         try
                         {
-                            // Drain MI_04 pipe continuously to prevent dongle FIFO overflow
-                            // If the dongle sends telemetry or audio frames (e.g. 0x03), we must consume them.
+                            // Drain the selected runtime IN pipe continuously to prevent dongle FIFO overflow.
+                            // Active identities also deliver controller input on this same unified pipe.
                             await _transport.ReadReportAsync(drainBuffer, readTimeoutMs, ct);
                         }
                         catch (OperationCanceledException)

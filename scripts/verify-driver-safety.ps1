@@ -149,8 +149,8 @@ $requiredPortableTargets = @(
     'new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")',
     'manifestHardwareIds.IsSubsetOf(expectedHardwareIds)',
     '$candidateDevices.Count -gt 0',
-    '$selectionAttempt -le 10',
-    'Driver target selection attempt=$selectionAttempt/10',
+    '$selectionAttempt -le 6',
+    'Driver target selection attempt=$selectionAttempt/6',
     'if ($interfaceId -ge 0) { $argsArray += @(''-i'', $interfaceId) }',
     "'-o', '15000'",
     'taskkill.exe /PID $proc.Id /T /F',
@@ -163,9 +163,13 @@ $requiredPortableTargets = @(
     'operationName: "automatic rollback"',
     'AppendReceiverBindingReenumerationScript(ps1, config, wdiLog)',
     'pnputil.exe /restart-device $bindingDevice.InstanceId',
+    'pnputil.exe /remove-device $bindingDevice.InstanceId',
+    'PnP strong re-enumeration remove exact MI_03',
     'Receiver binding re-enumeration failed',
     'Write-PnpSnapshot -label ''selected-before-install''',
     'selection-failed-all-vendor-nodes-including-phantoms',
+    'Write-PnpBasicSnapshot',
+    '-limit 40',
     'DEVPKEY_Device_ProblemCode',
     'DEVPKEY_Device_Parent',
     'wdi-simple stdout tail',
@@ -176,8 +180,9 @@ $requiredPortableTargets = @(
     'await runtimeTransport.DisconnectAsync();',
     'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} install")',
     'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} {operationName}")',
-    'MI_04 must expose 64-byte OUT 0x02 / IN 0x82 pipes',
-    'MI_03 must expose a 64-byte IN 0x81 pipe through WinUSB.'
+    'TimeSpan.FromMinutes(4)',
+    'process.Kill(entireProcessTree: true)',
+    'identity VID=0x{vid:X4} PID=0x{pid:X4} must expose its 64-byte control pair'
 )
 
 foreach ($fragment in $requiredPortableTargets) {
@@ -219,10 +224,10 @@ if ($source -match 'Read-Host') {
 }
 
 $requiredV1RuntimeFragments = @(
-    'new WirelessReceiverIdentity(0x1B1C, 0x3A08, "Envision Pro Wireless USB Receiver V2 (base)", false, true)',
-    'new WirelessReceiverIdentity(0x1B1C, 0x3A09, "Envision Pro Wireless USB Receiver V2 (active)", false, false)',
-    'new WirelessReceiverIdentity(0x2E95, 0x434E, "SCUF PC Controller Dongle V1 (base)", true, true)',
-    'new WirelessReceiverIdentity(0x2E95, 0x5046, "SCUF PC Controller Dongle V1 (active)", true, false)',
+    'new WirelessReceiverIdentity(0x1B1C, 0x3A08, "Envision Pro Wireless USB Receiver V2 (base)", false, true, 0x02, 0x82, true)',
+    'new WirelessReceiverIdentity(0x1B1C, 0x3A09, "Envision Pro Wireless USB Receiver V2 (active)", false, false, 0x01, 0x81, false)',
+    'new WirelessReceiverIdentity(0x2E95, 0x434E, "SCUF PC Controller Dongle V1 (base)", true, true, 0x02, 0x82, true)',
+    'new WirelessReceiverIdentity(0x2E95, 0x5046, "SCUF PC Controller Dongle V1 (active)", true, false, 0x01, 0x81, false)',
     'WirelessReceiverIdentities.Any',
     'receiverIdentity: receiverIdentity',
     'SelectedReceiverIdentity = candidate.Identity',
@@ -230,6 +235,12 @@ $requiredV1RuntimeFragments = @(
     'IsTargetCompatibleCandidate',
     'Ignoring non-interface WinUSB candidate',
     'candidate.Identity.UsesCompositeInterfaces',
+    'candidate.Identity.UsesUnifiedActiveTransport',
+    'identity.ControlOutPipe',
+    'identity.ControlInPipe',
+    'selectedReceiverIdentity?.UsesDedicatedRadioInterface == true',
+    'A single runtime reader is enforced; no auxiliary radio handle will be opened.',
+    'MaxEnumerationAttempts = 8',
     'WirelessWinUsbInterfaceTarget.RadioMi03 =>',
     'WirelessWinUsbInterfaceTarget.RuntimeMi04 =>'
 )

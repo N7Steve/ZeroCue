@@ -8,7 +8,13 @@ namespace ZeroCue.DataProbe.Services
         int ProductId,
         string Variant,
         bool IsExperimental,
-        bool UsesCompositeInterfaces);
+        bool UsesCompositeInterfaces,
+        byte ControlOutPipe,
+        byte ControlInPipe,
+        bool UsesDedicatedRadioInterface)
+    {
+        public bool UsesUnifiedActiveTransport => !UsesDedicatedRadioInterface;
+    }
 
     public sealed record SupportedScufDeviceProfile
     {
@@ -21,8 +27,6 @@ namespace ZeroCue.DataProbe.Services
         public required int HidUsagePage { get; init; }
         public required int HidUsage { get; init; }
         public required int ReportSize { get; init; }
-        public required byte WinUsbOutPipe { get; init; }
-        public required byte WinUsbInPipe { get; init; }
         public required byte InitCommandChannel { get; init; }
         public required byte InitAckChannel { get; init; }
         public required byte RuntimeCommandChannel { get; init; }
@@ -62,18 +66,16 @@ namespace ZeroCue.DataProbe.Services
             HidUsagePage = 0xFF42,
             HidUsage = 0x0001,
             ReportSize = 64,
-            WinUsbOutPipe = 0x02,
-            WinUsbInPipe = 0x82,
             InitCommandChannel = 0x08,
             InitAckChannel = 0x00,
             RuntimeCommandChannel = 0x09,
             RuntimeAckChannel = 0x01,
             WirelessReceiverIdentities = new[]
             {
-                new WirelessReceiverIdentity(0x1B1C, 0x3A08, "Envision Pro Wireless USB Receiver V2 (base)", false, true),
-                new WirelessReceiverIdentity(0x1B1C, 0x3A09, "Envision Pro Wireless USB Receiver V2 (active)", false, false),
-                new WirelessReceiverIdentity(0x2E95, 0x434E, "SCUF PC Controller Dongle V1 (base)", true, true),
-                new WirelessReceiverIdentity(0x2E95, 0x5046, "SCUF PC Controller Dongle V1 (active)", true, false)
+                new WirelessReceiverIdentity(0x1B1C, 0x3A08, "Envision Pro Wireless USB Receiver V2 (base)", false, true, 0x02, 0x82, true),
+                new WirelessReceiverIdentity(0x1B1C, 0x3A09, "Envision Pro Wireless USB Receiver V2 (active)", false, false, 0x01, 0x81, false),
+                new WirelessReceiverIdentity(0x2E95, 0x434E, "SCUF PC Controller Dongle V1 (base)", true, true, 0x02, 0x82, true),
+                new WirelessReceiverIdentity(0x2E95, 0x5046, "SCUF PC Controller Dongle V1 (active)", true, false, 0x01, 0x81, false)
             }
         };
     }

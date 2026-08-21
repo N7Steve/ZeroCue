@@ -17,7 +17,10 @@ namespace ZeroCue.DataProbe.Services
         private long _lastLoggedElapsedMs;
         private bool _disposed;
 
-        public WirelessWinUsbInputMapLogger(Action<string> uiLogger, bool enabled)
+        public WirelessWinUsbInputMapLogger(
+            Action<string> uiLogger,
+            bool enabled,
+            string source = "WinUSB auxiliary radio input endpoint 0x81")
         {
             if (enabled)
             {
@@ -25,7 +28,7 @@ namespace ZeroCue.DataProbe.Services
 
                 WriteLine("WirelessWinUsbInputMapLogger start.");
                 WriteLine($"timestamp={DateTimeOffset.Now:O}");
-                WriteLine("source=WinUSB auxiliary radio input endpoint 0x81");
+                WriteLine($"source={source}");
                 WriteLine("capture_notes=Press one control at a time, hold about 1 second, release to neutral between controls.");
                 WriteLine($"capture_sampling=minIntervalMs={FrameLogMinIntervalMs}; changed frames inside the window are counted as suppressed.");
                 WriteLine("frame_format=[FRAME] seq elapsedMs dtMs len diffs bits u16 subframes hex");

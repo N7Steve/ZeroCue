@@ -47,6 +47,7 @@ namespace ZeroCue.DataProbe.Services
     {
         private const int GlobalTimeoutMs = 30_000;
         private const int MaxAttempts = 5;
+        private const int MaxEnumerationAttempts = 8;
 
         private readonly Action<string> _uiLogger;
         private readonly SemaphoreSlim _ioLock;
@@ -73,6 +74,7 @@ namespace ZeroCue.DataProbe.Services
         {
             var globalSw = Stopwatch.StartNew();
             var attempts = 0;
+            var enumerationAttempts = 0;
             var reconnectCount = 0;
             var retryDelayMs = 150;
             string? lastPath = null;
@@ -98,16 +100,19 @@ namespace ZeroCue.DataProbe.Services
                 Log("WirelessWinUsbAggressiveSessionProbe start.");
                 Log($"timestamp={DateTimeOffset.Now:O}");
                 Log("WinUSB enabled=true");
-                Log("mode=WinUsbDualInterfaceHandshake");
+                Log("mode=WinUsbIdentityTopologyHandshake");
                 Log($"options firstHeartbeatWindowMs={_options.FirstHeartbeatWindowMs} stableSessionTargetMs={_options.StableSessionTargetMs} ackWaitTimeoutMs={_options.AckWaitTimeoutMs} ackReadTimeoutMs={_options.AckReadTimeoutMs} replayDelayCapMs={_options.ReplayDelayCapMs?.ToString() ?? "capture"} replayReportLimit={_options.ReplayReportLimit?.ToString() ?? "all"} requireRuntimeSetValidation={_options.RequireRuntimeSetValidation}");
-                Log("WinUSB dual-interface receiver session enabled.");
+                Log("WinUSB receiver session enabled for dual-interface base and unified active identities.");
                 LogCorsairProcesses();
 
-                while (globalSw.ElapsedMilliseconds < GlobalTimeoutMs && attempts < MaxAttempts)
+                while (globalSw.ElapsedMilliseconds < GlobalTimeoutMs &&
+                    attempts < MaxAttempts &&
+                    enumerationAttempts < MaxEnumerationAttempts)
                 {
                     ct.ThrowIfCancellationRequested();
                     failureStage = "EnumerateWinUsb";
-                    Log($"Enumeration loop elapsedMs={globalSw.ElapsedMilliseconds} attempts={attempts}/{MaxAttempts}");
+                    enumerationAttempts++;
+                    Log($"Enumeration loop elapsedMs={globalSw.ElapsedMilliseconds} enumerationAttempts={enumerationAttempts}/{MaxEnumerationAttempts} handshakeAttempts={attempts}/{MaxAttempts}");
 
                     WirelessDongleWinUsbTransport? radioTransport = null;
                     CancellationTokenSource? radioPumpCts = null;
@@ -115,7 +120,7 @@ namespace ZeroCue.DataProbe.Services
                     var runtimeTransport = new WirelessDongleWinUsbTransport(Log, WirelessWinUsbInterfaceTarget.RuntimeMi04);
                     if (!await runtimeTransport.ConnectAsync(ct))
                     {
-                        error = "No wireless receiver WinUSB candidate exposed OUT 0x02 / IN 0x82 with 64-byte packets.";
+                        error = "No wireless receiver WinUSB candidate exposed the identity-specific 64-byte control pipe pair (base 0x02/0x82 or active 0x01/0x81).";
                         Log(error);
                         await runtimeTransport.DisconnectAsync();
                         await DelayBeforeRetryAsync("RuntimeControlPipesUnavailable");
@@ -134,37 +139,53 @@ namespace ZeroCue.DataProbe.Services
 
                     lastPath = runtimeTransport.DevicePath;
                     var selectedReceiverIdentity = runtimeTransport.SelectedReceiverIdentity;
-                    Log($"Handshake attempt={attempts} receiverVariant={selectedReceiverIdentity?.Variant ?? "unknown"} experimental={selectedReceiverIdentity?.IsExperimental ?? false} identity={(selectedReceiverIdentity == null ? "unknown" : $"VID_0x{selectedReceiverIdentity.VendorId:X4}:PID_0x{selectedReceiverIdentity.ProductId:X4}")} runtimePath={runtimeTransport.DevicePath}");
+                    Log($"Handshake attempt={attempts} receiverVariant={selectedReceiverIdentity?.Variant ?? "unknown"} experimental={selectedReceiverIdentity?.IsExperimental ?? false} identity={(selectedReceiverIdentity == null ? "unknown" : $"VID_0x{selectedReceiverIdentity.VendorId:X4}:PID_0x{selectedReceiverIdentity.ProductId:X4}")} topology={(selectedReceiverIdentity?.UsesUnifiedActiveTransport == true ? "unified-active" : "dual-interface")} controlPipes={(selectedReceiverIdentity == null ? "unknown" : $"0x{selectedReceiverIdentity.ControlOutPipe:X2}/0x{selectedReceiverIdentity.ControlInPipe:X2}")} runtimePath={runtimeTransport.DevicePath}");
 
-                    try
+                    if (selectedReceiverIdentity?.UsesDedicatedRadioInterface == true)
                     {
-                        failureStage = "OpenAuxiliaryRadioInput";
-                        radioTransport = new WirelessDongleWinUsbTransport(
-                            Log,
-                            WirelessWinUsbInterfaceTarget.RadioMi03,
-                            logReadPayloads: false,
-                            receiverIdentity: selectedReceiverIdentity);
-                        if (await radioTransport.ConnectAsync(ct))
+                        try
                         {
-                            radioPumpCts = new CancellationTokenSource();
-                            radioPumpTask = RunRadioMi03PumpAsync(radioTransport, radioPumpCts.Token, _options.EnableFileLogging);
-                            Log($"Auxiliary input WinUSB open radioPath={radioTransport.DevicePath}");
+                            failureStage = "OpenAuxiliaryRadioInput";
+                            radioTransport = new WirelessDongleWinUsbTransport(
+                                Log,
+                                WirelessWinUsbInterfaceTarget.RadioMi03,
+                                logReadPayloads: false,
+                                receiverIdentity: selectedReceiverIdentity);
+                            if (await radioTransport.ConnectAsync(ct))
+                            {
+                                radioPumpCts = new CancellationTokenSource();
+                                radioPumpTask = RunRadioMi03PumpAsync(radioTransport, radioPumpCts.Token, _options.EnableFileLogging);
+                                Log($"Auxiliary input WinUSB open radioPath={radioTransport.DevicePath}");
+                            }
+                            else
+                            {
+                                Log("Auxiliary input WinUSB pipe 0x81 not available; continuing with runtime/control validation only.");
+                                await radioTransport.DisconnectAsync();
+                                radioTransport = null;
+                            }
                         }
-                        else
+                        catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is TimeoutException)
                         {
-                            Log("Auxiliary input WinUSB pipe 0x81 not available; continuing with runtime/control validation only.");
-                            await radioTransport.DisconnectAsync();
-                            radioTransport = null;
+                            Log($"Auxiliary input open skipped: {ex.Message}");
+                            if (radioTransport != null)
+                            {
+                                await radioTransport.DisconnectAsync();
+                                radioTransport = null;
+                            }
                         }
                     }
-                    catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is TimeoutException)
+                    else if (selectedReceiverIdentity?.UsesUnifiedActiveTransport == true)
                     {
-                        Log($"Auxiliary input open skipped: {ex.Message}");
-                        if (radioTransport != null)
+                        var unifiedInputMapLogger = new WirelessWinUsbInputMapLogger(
+                            Log,
+                            _options.EnableFileLogging,
+                            $"WinUSB unified active control/input endpoint 0x{selectedReceiverIdentity.ControlInPipe:X2}");
+                        runtimeTransport.FrameObserver = (frame, length) =>
                         {
-                            await radioTransport.DisconnectAsync();
-                            radioTransport = null;
-                        }
+                            unifiedInputMapLogger.ObserveFrame(frame, length);
+                            _options.ControllerActivityObserver?.Invoke();
+                        };
+                        Log($"Unified active receiver transport selected: commands, ACKs and controller input share OUT 0x{selectedReceiverIdentity.ControlOutPipe:X2} / IN 0x{selectedReceiverIdentity.ControlInPipe:X2}. A single runtime reader is enforced; no auxiliary radio handle will be opened.");
                     }
 
                     try
@@ -323,10 +344,12 @@ namespace ZeroCue.DataProbe.Services
                 }
 
                 error ??= attempts >= MaxAttempts
-                    ? "Max aggressive WinUSB attempts reached."
-                    : "Global aggressive WinUSB timeout reached.";
+                    ? "Max aggressive WinUSB handshake attempts reached."
+                    : enumerationAttempts >= MaxEnumerationAttempts
+                        ? "Max bounded WinUSB enumeration attempts reached."
+                        : "Global aggressive WinUSB timeout reached.";
                 Log($"WirelessWinUsbAggressiveSessionProbe failed: {error}");
-                Log("Recommendation: use ZeroCue receiver driver restoration for the exact detected identity (VID_1B1C PID_3A08/PID_3A09 or experimental VID_2E95 PID_434E) and restart Windows if the receiver keeps reenumerating badly.");
+                Log("Recommendation: use ZeroCue receiver driver restoration for the exact detected identity (VID_1B1C PID_3A08/PID_3A09 or experimental VID_2E95 PID_434E/PID_5046) and restart Windows if the receiver keeps reenumerating badly.");
 
                 return new WirelessWinUsbAggressiveSessionProbeResult
                 {

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,7 +11,27 @@ namespace ZeroCue.DataProbe.Services
     {
         private async Task<bool> TryConnectWirelessAsync(bool autoConnect)
         {
-            return await TryConnectWirelessWinUsbAsync(autoConnect);
+            if (autoConnect)
+            {
+                var now = Stopwatch.GetTimestamp();
+                if (now < Interlocked.Read(ref _nextWirelessAutoProbeTimestamp))
+                {
+                    return false;
+                }
+            }
+
+            var connected = await TryConnectWirelessWinUsbAsync(autoConnect);
+            if (connected)
+            {
+                Interlocked.Exchange(ref _nextWirelessAutoProbeTimestamp, 0);
+            }
+            else if (autoConnect)
+            {
+                var cooldownTicks = 10L * Stopwatch.Frequency;
+                Interlocked.Exchange(ref _nextWirelessAutoProbeTimestamp, Stopwatch.GetTimestamp() + cooldownTicks);
+            }
+
+            return connected;
         }
 
         private async Task<bool> TryConnectWirelessWinUsbAsync(bool autoConnect)
@@ -42,7 +63,7 @@ namespace ZeroCue.DataProbe.Services
             {
                 if (!autoConnect)
                 {
-                    LogInput($"[WIRELESS-WINUSB] Buscando receiver WinUSB compatible identities={string.Join(',', DeviceProfile.WirelessReceiverIdentities.Select(identity => $"{identity.VendorId:X4}:{identity.ProductId:X4}{(identity.IsExperimental ? "[experimental]" : string.Empty)}"))} con OUT 0x02 / IN 0x82 y MaxPacketSize=64...");
+                    LogInput($"[WIRELESS-WINUSB] Buscando receiver WinUSB compatible identities={string.Join(',', DeviceProfile.WirelessReceiverIdentities.Select(identity => $"{identity.VendorId:X4}:{identity.ProductId:X4}{(identity.IsExperimental ? "[experimental]" : string.Empty)}[OUT=0x{identity.ControlOutPipe:X2}/IN=0x{identity.ControlInPipe:X2}]"))} y MaxPacketSize=64...");
                     WirelessHidDetectionService.ScanSupportedReceiverCollections(LogInput);
                 }
 
@@ -86,7 +107,7 @@ namespace ZeroCue.DataProbe.Services
                 }
 
                 _wirelessWinUsbTransport = result.Transport;
-                _wirelessWinUsbTransport.FrameObserver = ProcessWirelessWinUsbInputFrame;
+                _wirelessWinUsbTransport.FrameObserver += ProcessWirelessWinUsbInputFrame;
                 _wirelessWinUsbAuxRadioTransport = result.AuxiliaryRadioTransport;
                 _wirelessWinUsbAuxRadioCts = result.AuxiliaryRadioPumpCts;
                 _wirelessWinUsbAuxRadioTask = result.AuxiliaryRadioPumpTask;

@@ -79,10 +79,12 @@ jobs:
           experimental original SCUF PC Controller Dongle while preserving the
           existing V2 support:
 
-          - Detects the experimental V1 dongle as VID_2E95 / PID_434E and installs
-            WinUSB only on MI_04 for control and MI_03 for wireless input.
-          - Never replaces the V1 MI_00 interface or USB composite parent, keeping
-            the official Scufdriver6 binding outside ZeroCue's scope.
+          - Detects the experimental V1 dongle as composite base state
+            VID_2E95 / PID_434E and observed active state VID_2E95 / PID_5046.
+          - Installs WinUSB only on MI_04 and MI_03 in the 434E base state, while
+            treating 5046 as a whole-device active state equivalent to V2 3A09.
+          - Never replaces V1 434E MI_00 or its USB composite parent, keeping the
+            official Scufdriver6 binding outside ZeroCue's scope.
           - Rescans and briefly waits for a supported receiver when Windows is
             still enumerating it as the elevated installation begins.
           - Restarts and rescans only the selected receiver interfaces after driver

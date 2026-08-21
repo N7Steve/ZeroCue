@@ -119,9 +119,7 @@ namespace ZeroCue.DataProbe.Services
 
         private bool IsTargetCompatibleCandidate(ReceiverCandidate candidate)
         {
-            bool requiresExactCompositeInterface = candidate.Identity.IsExperimental ||
-                candidate.Identity.ProductId == DeviceProfile.WirelessBasePid;
-            if (!requiresExactCompositeInterface)
+            if (!candidate.Identity.UsesCompositeInterfaces)
             {
                 return true;
             }
@@ -483,7 +481,7 @@ namespace ZeroCue.DataProbe.Services
             value.HasValue ? $"0x{value.Value:X4}" : "<unknown>";
 
         private static string FormatIdentity(WirelessReceiverIdentity identity) =>
-            $"{identity.Variant}[VID_0x{identity.VendorId:X4},PID_0x{identity.ProductId:X4},experimental={identity.IsExperimental}]";
+            $"{identity.Variant}[VID_0x{identity.VendorId:X4},PID_0x{identity.ProductId:X4},experimental={identity.IsExperimental},composite={identity.UsesCompositeInterfaces}]";
 
         private sealed record ReceiverCandidate(string Path, WirelessReceiverIdentity Identity);
     }

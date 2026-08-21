@@ -92,14 +92,16 @@ ZeroCue records the driver packages it installs and its restore option only
 removes verified packages for the selected SCUF controller or receiver. Restoring
 the original driver allows iCUE to detect the device again.
 
-For the experimental `2E95:434E` V1 dongle, ZeroCue modifies only interfaces
-`MI_03` and `MI_04`; it does not replace `MI_00` or the composite parent. If the
-required 64-byte WinUSB endpoints are not immediately available after
-installation, ZeroCue restarts and rescans only those interfaces, waits for their
-new device paths, and retries validation. If validation still fails, ZeroCue
-reports the detected topology and starts an exact automatic rollback. Recovery
-also waits for every previously present interface to return on its original
-driver before reporting success.
+For the experimental V1 dongle, ZeroCue treats `2E95:434E` as its composite base
+state and modifies only interfaces `MI_03` and `MI_04`; it does not replace
+`MI_00` or the composite parent. The observed `2E95:5046` identity is treated as
+the experimental active state and follows the same whole-device model as the V2
+active receiver. If the required 64-byte WinUSB endpoints are not immediately
+available after installation, ZeroCue restarts and rescans the composite
+interfaces when applicable, waits for the new device paths, and retries
+validation. If validation still fails, ZeroCue reports the detected topology and
+starts an exact automatic rollback. Recovery also waits for every previously
+present interface to return on its original driver before reporting success.
 
 ZeroCue is not required for recovery. You can use Windows Device Manager as an
 administrator, locate only the SCUF controller or receiver interfaces modified by

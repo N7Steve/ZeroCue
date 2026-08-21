@@ -1257,7 +1257,8 @@ namespace ZeroCue.DataProbe.Services
                                 new[]
                                 {
                                     new DriverBinding("0x434E", 4, "experimental V1 interface 4 (MI_04)"),
-                                    new DriverBinding("0x434E", 3, "experimental V1 interface 3 (MI_03)")
+                                    new DriverBinding("0x434E", 3, "experimental V1 interface 3 (MI_03)"),
+                                    new DriverBinding("0x5046", null, "experimental V1 active receiver device")
                                 },
                                 Array.Empty<ObsoleteDriverBinding>())
                         }),

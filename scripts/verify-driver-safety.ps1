@@ -133,12 +133,14 @@ $requiredPortableTargets = @(
     '"0x3A09"',
     '"0x2E95"',
     '"0x434E"',
+    '"0x5046"',
     'new DriverBinding("0x3A08", 4, "V2 interface 4 (MI_04)")',
     'new DriverBinding("0x3A08", 3, "V2 interface 3 (MI_03)")',
     'new ObsoleteDriverBinding("0x3A08", 0, "obsolete V2 interface 0 (MI_00)")',
     'new DriverBinding("0x3A09", null, "V2 active receiver device")',
     'new DriverBinding("0x434E", 4, "experimental V1 interface 4 (MI_04)")',
     'new DriverBinding("0x434E", 3, "experimental V1 interface 3 (MI_03)")',
+    'new DriverBinding("0x5046", null, "experimental V1 active receiver device")',
     'new DriverBinding("0x3A05", 0, "interface 0 (MI_00)")',
     'new DriverBinding("0x3A05", 4, "interface 4 (MI_04)")',
     'new DriverBinding("0x3A05", 3, "interface 3 (MI_03)")',
@@ -199,20 +201,26 @@ if ($source -match 'new DriverBinding\(\"0x434E\",\s*(0|null)') {
     throw "PID 434E V1 MI_00 and the composite parent must never be replaced with WinUSB."
 }
 
+if ($source -match 'new DriverBinding\(\"0x5046\",\s*[0-9]') {
+    throw "PID 5046 is modeled as the V1 whole-device active state and must not be installed as a composite MI interface."
+}
+
 if ($source -match 'Read-Host') {
     throw "The elevated driver workflow must not block indefinitely waiting for console input."
 }
 
 $requiredV1RuntimeFragments = @(
-    'new WirelessReceiverIdentity(0x2E95, 0x434E, "SCUF PC Controller Dongle V1", true)',
+    'new WirelessReceiverIdentity(0x1B1C, 0x3A08, "Envision Pro Wireless USB Receiver V2 (base)", false, true)',
+    'new WirelessReceiverIdentity(0x1B1C, 0x3A09, "Envision Pro Wireless USB Receiver V2 (active)", false, false)',
+    'new WirelessReceiverIdentity(0x2E95, 0x434E, "SCUF PC Controller Dongle V1 (base)", true, true)',
+    'new WirelessReceiverIdentity(0x2E95, 0x5046, "SCUF PC Controller Dongle V1 (active)", true, false)',
     'WirelessReceiverIdentities.Any',
     'receiverIdentity: receiverIdentity',
     'SelectedReceiverIdentity = candidate.Identity',
     'receiverIdentity: selectedReceiverIdentity',
     'IsTargetCompatibleCandidate',
     'Ignoring non-interface WinUSB candidate',
-    'candidate.Identity.IsExperimental',
-    'candidate.Identity.ProductId == DeviceProfile.WirelessBasePid',
+    'candidate.Identity.UsesCompositeInterfaces',
     'WirelessWinUsbInterfaceTarget.RadioMi03 =>',
     'WirelessWinUsbInterfaceTarget.RuntimeMi04 =>'
 )

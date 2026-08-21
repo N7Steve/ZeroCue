@@ -98,10 +98,14 @@ state and modifies only interfaces `MI_03` and `MI_04`; it does not replace
 the experimental active state and follows the same whole-device model as the V2
 active receiver. If the required 64-byte WinUSB endpoints are not immediately
 available after installation, ZeroCue restarts and rescans the composite
-interfaces when applicable, waits for the new device paths, and retries
+interfaces or active whole-device binding as applicable, waits for the new device paths, and retries
 validation. If validation still fails, ZeroCue reports the detected topology and
 starts an exact automatic rollback. Recovery also waits for every previously
 present interface to return on its original driver before reporting success.
+Installation diagnostics include present and phantom vendor PnP nodes, parent and
+problem-code properties, WinUSB binding readiness, rescan output, and the final
+`wdi-simple` output. Automatic rollback also records a complete PowerShell and
+`pnputil` transcript in the communication log.
 
 ZeroCue is not required for recovery. You can use Windows Device Manager as an
 administrator, locate only the SCUF controller or receiver interfaces modified by

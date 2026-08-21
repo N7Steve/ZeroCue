@@ -65,14 +65,36 @@ namespace ZeroCue.DataProbe.Services
                 string runId = DateTime.Now.ToString("yyyyMMddHHmmss");
                 string tempDirPrefix = Path.Combine(workDir, $"zerocue_wdi_{config.LogName}_{runId}");
                 string previouslyOwnedInfValues = string.Join(",", previouslyOwnedPackages.Select(PowerShellLiteral));
+                string diagnosticVendorPatternValues = string.Join(",", config.Variants
+                    .Select(variant => $"USB\\VID_{variant.VidValue}*")
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Select(PowerShellLiteral));
 
                 var ps1 = new StringBuilder();
                 ps1.AppendLine($"Write-Output '=== WDI Install Log {config.DisplayName} ({DateTime.Now:yyyyMMddHHmmss}) ===' > {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine("function Get-PublishedInfNames {");
                 ps1.AppendLine("    @(Get-ChildItem -Path (Join-Path $env:windir 'INF\\oem*.inf') -File -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name)");
                 ps1.AppendLine("}");
+                ps1.AppendLine("function Write-PnpSnapshot {");
+                ps1.AppendLine("    param([string]$label, [object[]]$devices)");
+                ps1.AppendLine("    $deviceList = @($devices)");
+                ps1.AppendLine($"    Write-Output \"PnP snapshot label=$label count=$($deviceList.Count)\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine("    foreach ($device in $deviceList | Sort-Object InstanceId) {");
+                ps1.AppendLine("        $driverInf = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data");
+                ps1.AppendLine("        $hardwareIds = ((Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_HardwareIds' -ErrorAction SilentlyContinue).Data -join ';')");
+                ps1.AppendLine("        $compatibleIds = ((Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_CompatibleIds' -ErrorAction SilentlyContinue).Data -join ';')");
+                ps1.AppendLine("        $parent = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_Parent' -ErrorAction SilentlyContinue).Data");
+                ps1.AppendLine("        $problemCode = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_ProblemCode' -ErrorAction SilentlyContinue).Data");
+                ps1.AppendLine("        $problemStatus = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_ProblemStatus' -ErrorAction SilentlyContinue).Data");
+                ps1.AppendLine("        $locationPaths = ((Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_LocationPaths' -ErrorAction SilentlyContinue).Data -join ';')");
+                ps1.AppendLine("        $containerId = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_ContainerId' -ErrorAction SilentlyContinue).Data");
+                ps1.AppendLine("        $busDescription = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_BusReportedDeviceDesc' -ErrorAction SilentlyContinue).Data");
+                ps1.AppendLine($"        Write-Output \"PnP node label=$label present=$($device.Present) friendlyName=$($device.FriendlyName) busDescription=$busDescription instance=$($device.InstanceId) status=$($device.Status) class=$($device.Class) service=$($device.Service) driverInf=$driverInf problemCode=$problemCode problemStatus=$problemStatus parent=$parent containerId=$containerId locationPaths=$locationPaths hardwareIds=$hardwareIds compatibleIds=$compatibleIds\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine("    }");
+                ps1.AppendLine("}");
                 ps1.AppendLine("$publishedInfsBefore = @(Get-PublishedInfNames)");
                 ps1.AppendLine($"$knownOwnedInfs = @({previouslyOwnedInfValues})");
+                ps1.AppendLine($"$diagnosticVendorPatterns = @({diagnosticVendorPatternValues})");
                 ps1.AppendLine("$targets = @(");
                 foreach (var variant in config.Variants)
                 {
@@ -87,7 +109,18 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("$selectedTarget = $null");
                 ps1.AppendLine("$selectedDevices = @()");
                 ps1.AppendLine("for ($selectionAttempt = 1; $selectionAttempt -le 10 -and $null -eq $selectedTarget; $selectionAttempt++) {");
-                ps1.AppendLine("    if ($selectionAttempt -eq 1 -or $selectionAttempt -eq 5) { & pnputil.exe /scan-devices | Out-Null }");
+                ps1.AppendLine("    if ($selectionAttempt -eq 1 -or $selectionAttempt -eq 5) {");
+                ps1.AppendLine("        $selectionScanOutput = & pnputil.exe /scan-devices 2>&1");
+                ps1.AppendLine("        $selectionScanExitCode = $LASTEXITCODE");
+                ps1.AppendLine($"        Write-Output \"PnP selection scan attempt=$selectionAttempt exitCode=$selectionScanExitCode output=$($selectionScanOutput -join ' | ')\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine("    }");
+                ps1.AppendLine("    if ($selectionAttempt -eq 1 -or $selectionAttempt -eq 5 -or $selectionAttempt -eq 10) {");
+                ps1.AppendLine("        $presentVendorDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
+                ps1.AppendLine("            $instanceId = $_.InstanceId");
+                ps1.AppendLine("            @($diagnosticVendorPatterns | Where-Object { $instanceId -like $_ }).Count -gt 0");
+                ps1.AppendLine("        })");
+                ps1.AppendLine("        Write-PnpSnapshot -label \"selection-attempt-$selectionAttempt-present-vendor-nodes\" -devices $presentVendorDevices");
+                ps1.AppendLine("    }");
                 ps1.AppendLine("    foreach ($candidateTarget in $targets) {");
                 ps1.AppendLine("        $candidatePattern = \"USB\\VID_$($candidateTarget.VidValue)&PID_$($candidateTarget.PidValue)*\"");
                 ps1.AppendLine("        $candidateDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $candidatePattern })");
@@ -97,6 +130,11 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("    if ($null -eq $selectedTarget -and $selectionAttempt -lt 10) { Start-Sleep -Seconds 1 }");
                 ps1.AppendLine("}");
                 ps1.AppendLine("if ($null -eq $selectedTarget) {");
+                ps1.AppendLine("    $allVendorDevices = @(Get-PnpDevice -ErrorAction SilentlyContinue | Where-Object {");
+                ps1.AppendLine("        $instanceId = $_.InstanceId");
+                ps1.AppendLine("        @($diagnosticVendorPatterns | Where-Object { $instanceId -like $_ }).Count -gt 0");
+                ps1.AppendLine("    })");
+                ps1.AppendLine("    Write-PnpSnapshot -label 'selection-failed-all-vendor-nodes-including-phantoms' -devices $allVendorDevices");
                 ps1.AppendLine($"    Write-Output \"No present {config.DisplayName} matched supported identities: $($supportedIdentities -join ', ').\" >> {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine($"    Write-Output 'results=' > {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine($"    Write-Output 'packages=' >> {PowerShellLiteral(resultPath)}");
@@ -113,11 +151,7 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("$selectedDeviceName = $selectedTarget.DeviceName");
                 ps1.AppendLine("$selectedExperimental = $selectedTarget.Experimental");
                 ps1.AppendLine($"Write-Output \"Selected variant=$selectedVariant experimental=$selectedExperimental VID_$selectedVidValue&PID_$selectedPidValue.\" >> {PowerShellLiteral(wdiLog)}");
-                ps1.AppendLine("foreach ($device in $selectedDevices | Sort-Object InstanceId) {");
-                ps1.AppendLine("    $driverInf = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data");
-                ps1.AppendLine("    $hardwareIds = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_HardwareIds' -ErrorAction SilentlyContinue).Data -join ';'");
-                ps1.AppendLine($"    Write-Output \"PnP before install instance=$($device.InstanceId) status=$($device.Status) class=$($device.Class) service=$($device.Service) driverInf=$driverInf hardwareIds=$hardwareIds\" >> {PowerShellLiteral(wdiLog)}");
-                ps1.AppendLine("}");
+                ps1.AppendLine("Write-PnpSnapshot -label 'selected-before-install' -devices $selectedDevices");
                 ps1.AppendLine("Write-Host '=======================================' -ForegroundColor Cyan");
                 ps1.AppendLine($"Write-Host '  Installing WinUSB: {config.DisplayName}' -ForegroundColor Cyan");
                 ps1.AppendLine("Write-Host '=======================================' -ForegroundColor Cyan");
@@ -151,6 +185,7 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("        $argsArray = @('-n', $selectedDeviceName, '-v', $selectedVid, '-p', $selectedPid)");
                 ps1.AppendLine("        if ($interfaceId -ge 0) { $argsArray += @('-i', $interfaceId) }");
                 ps1.AppendLine("        $argsArray += @('-t', '0', '-s', '-o', '15000', '-d', $tempDir)");
+                ps1.AppendLine($"        Write-Output \"wdi-simple command binding=$miString args=$($argsArray -join ' ') tempDir=$tempDir\" >> {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine($"        $proc = Start-Process -FilePath {PowerShellLiteral(wdiPath)} -ArgumentList $argsArray -PassThru -NoNewWindow -RedirectStandardOutput $wdiOut -RedirectStandardError $wdiErr");
                 ps1.AppendLine("        $maxWait = 60");
                 ps1.AppendLine("        $waited = 0");
@@ -181,17 +216,19 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("        try { $null = $proc.WaitForExit(5000); $proc.Refresh() } catch { }");
                 ps1.AppendLine("        $procExitCode = if ($proc.HasExited) { $proc.ExitCode } else { $null }");
                 ps1.AppendLine("        $procExitText = if ($null -eq $procExitCode) { '<unavailable>' } else { [string]$procExitCode }");
+                ps1.AppendLine($"        Write-Output \"wdi-simple completed binding=$miString processId=$($proc.Id) exitCode=$procExitText waitedSeconds=$waited\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine($"        if (Test-Path -LiteralPath $wdiOut) {{ Write-Output \"--- wdi-simple stdout tail binding=$miString ---\" >> {PowerShellLiteral(wdiLog)}; Get-Content -LiteralPath $wdiOut -Tail 200 -ErrorAction SilentlyContinue | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8 }}");
+                ps1.AppendLine($"        if (Test-Path -LiteralPath $wdiErr) {{ Write-Output \"--- wdi-simple stderr tail binding=$miString ---\" >> {PowerShellLiteral(wdiLog)}; Get-Content -LiteralPath $wdiErr -Tail 200 -ErrorAction SilentlyContinue | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8 }}");
                 ps1.AppendLine("        Start-Sleep -Seconds 2");
                 ps1.AppendLine("        $finalDevs = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
                 ps1.AppendLine("            $_.InstanceId -like $targetInstancePattern");
                 ps1.AppendLine("        })");
+                ps1.AppendLine("        Write-PnpSnapshot -label \"wdi-final-$miString\" -devices $finalDevs");
                 ps1.AppendLine("        if ($finalDevs.Count -gt 0 -and ($finalDevs.Service -match 'WINUSB' -or $finalDevs.Service -match 'WinUSB')) {");
                 ps1.AppendLine("            $ret = 0");
                 ps1.AppendLine("        } else {");
                 ps1.AppendLine("            $ret = -1");
                 ps1.AppendLine($"            Write-Output \"Failed: WINUSB not applied to $($miString). ExitCode: $procExitText\" >> {PowerShellLiteral(wdiLog)}");
-                ps1.AppendLine($"            if (Test-Path $wdiErr) {{ Write-Output \"wdi-simple stderr: $(Get-Content $wdiErr -Raw)\" >> {PowerShellLiteral(wdiLog)} }}");
-                ps1.AppendLine($"            if (Test-Path $wdiOut) {{ Write-Output \"wdi-simple stdout: $(Get-Content $wdiOut -Raw)\" >> {PowerShellLiteral(wdiLog)} }}");
                 ps1.AppendLine("        }");
                 ps1.AppendLine("    } catch {");
                 ps1.AppendLine($"        Write-Output \"Error $($miString): $($_.Exception.Message)\" >> {PowerShellLiteral(wdiLog)}");
@@ -223,7 +260,7 @@ namespace ZeroCue.DataProbe.Services
 
                 if (target == DriverTarget.Receiver)
                 {
-                    AppendReceiverInterfaceReenumerationScript(ps1, config, wdiLog);
+                    AppendReceiverBindingReenumerationScript(ps1, config, wdiLog);
                 }
 
                 ps1.AppendLine("$publishedInfsAfter = @(Get-PublishedInfNames)");
@@ -236,10 +273,7 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("}");
                 ps1.AppendLine("$selectedPattern = \"USB\\VID_$selectedVidValue&PID_$selectedPidValue*\"");
                 ps1.AppendLine("$afterDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $selectedPattern })");
-                ps1.AppendLine("foreach ($device in $afterDevices | Sort-Object InstanceId) {");
-                ps1.AppendLine("    $driverInf = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data");
-                ps1.AppendLine($"    Write-Output \"PnP after install instance=$($device.InstanceId) status=$($device.Status) class=$($device.Class) service=$($device.Service) driverInf=$driverInf\" >> {PowerShellLiteral(wdiLog)}");
-                ps1.AppendLine("}");
+                ps1.AppendLine("Write-PnpSnapshot -label 'selected-after-install' -devices $afterDevices");
                 ps1.AppendLine($"Write-Output \"results=$($resultCodes -join ',')\" > {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine($"Write-Output \"packages=$($ownedInfs -join ',')\" >> {PowerShellLiteral(resultPath)}");
                 ps1.AppendLine($"Write-Output \"vid=$selectedVidValue\" >> {PowerShellLiteral(resultPath)}");
@@ -259,9 +293,6 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("}");
                 ps1.AppendLine("Stop-Process -Name 'wdi-simple' -Force -ErrorAction SilentlyContinue");
                 ps1.AppendLine("Stop-Process -Name 'installer_x64' -Force -ErrorAction SilentlyContinue");
-                ps1.AppendLine("if ($resultCodes.Count -gt 0 -and $resultCodes -notcontains -1) {");
-                ps1.AppendLine($"    Get-ChildItem -Path {PowerShellLiteral(workDir)} -Filter 'zerocue_wdi_{config.LogName}_*' -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue");
-                ps1.AppendLine("}");
                 ps1.AppendLine("if ($resultCodes.Count -eq 0 -or $resultCodes -contains -1) { exit 1 }");
                 ps1.AppendLine("exit 0");
                 File.WriteAllText(ps1Path, ps1.ToString());
@@ -428,47 +459,80 @@ namespace ZeroCue.DataProbe.Services
             ps1.AppendLine("}");
         }
 
-        private static void AppendReceiverInterfaceReenumerationScript(
+        private static void AppendReceiverBindingReenumerationScript(
             StringBuilder ps1,
             DriverTargetConfig config,
             string wdiLog)
         {
-            var receiverInterfaceIds = config.Variants
-                .SelectMany(variant => variant.Bindings
-                    .Where(binding => binding.InterfaceId.HasValue)
-                    .Select(binding =>
-                        $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{binding.InterfaceId!.Value:X2}"))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+            var receiverBindings = config.Variants
+                .SelectMany(variant => variant.Bindings.Select(binding => new
+                {
+                    HardwareId = binding.InterfaceId is int interfaceId
+                        ? $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{interfaceId:X2}"
+                        : $"VID_{variant.VidValue}&PID_{binding.PidValue}",
+                    InstancePattern = binding.InterfaceId is int id
+                        ? $"USB\\VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{id:X2}\\*"
+                        : $"USB\\VID_{variant.VidValue}&PID_{binding.PidValue}\\*",
+                    binding.Name
+                }))
+                .GroupBy(binding => binding.HardwareId, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
                 .ToArray();
-            string interfaceIdValues = string.Join(",", receiverInterfaceIds.Select(PowerShellLiteral));
+            ps1.AppendLine("$receiverBindings = @(");
+            foreach (var binding in receiverBindings)
+            {
+                ps1.AppendLine($"    [pscustomobject]@{{ HardwareId={PowerShellLiteral(binding.HardwareId)}; InstancePattern={PowerShellLiteral(binding.InstancePattern)}; Name={PowerShellLiteral(binding.Name)} }}");
+            }
+            ps1.AppendLine(")");
 
-            ps1.AppendLine($"$selectedReceiverInterfaceIds = @({interfaceIdValues}) | Where-Object {{ $_ -like \"VID_$selectedVidValue&PID_$selectedPidValue*\" }}");
-            ps1.AppendLine("if ($selectedReceiverInterfaceIds.Count -gt 0 -and $resultCodes.Count -gt 0 -and $resultCodes -notcontains -1) {");
-            ps1.AppendLine($"    Write-Output 'Starting exact receiver interface re-enumeration after WinUSB installation.' >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("    $selectedInterfaceDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
+            ps1.AppendLine("$selectedReceiverBindings = @($receiverBindings | Where-Object { $_.HardwareId -like \"VID_$selectedVidValue&PID_$selectedPidValue*\" })");
+            ps1.AppendLine("if ($selectedReceiverBindings.Count -gt 0 -and $resultCodes.Count -gt 0 -and $resultCodes -notcontains -1) {");
+            ps1.AppendLine($"    Write-Output \"Starting exact receiver binding re-enumeration bindings=$($selectedReceiverBindings.Name -join '|').\" >> {PowerShellLiteral(wdiLog)}");
+            ps1.AppendLine("    $selectedBindingDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
             ps1.AppendLine("        $instanceId = $_.InstanceId");
-            ps1.AppendLine("        @($selectedReceiverInterfaceIds | Where-Object { $instanceId -match [regex]::Escape($_) }).Count -gt 0");
+            ps1.AppendLine("        @($selectedReceiverBindings | Where-Object { $instanceId -like $_.InstancePattern }).Count -gt 0");
             ps1.AppendLine("    })");
-            ps1.AppendLine("    foreach ($interfaceDevice in $selectedInterfaceDevices | Sort-Object InstanceId) {");
-            ps1.AppendLine("        $restartOutput = & pnputil.exe /restart-device $interfaceDevice.InstanceId 2>&1");
+            ps1.AppendLine("    Write-PnpSnapshot -label 'receiver-before-restart' -devices $selectedBindingDevices");
+            ps1.AppendLine("    foreach ($bindingDevice in $selectedBindingDevices | Sort-Object InstanceId) {");
+            ps1.AppendLine("        $restartOutput = & pnputil.exe /restart-device $bindingDevice.InstanceId 2>&1");
             ps1.AppendLine("        $restartExitCode = $LASTEXITCODE");
             ps1.AppendLine($"        $restartOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
-            ps1.AppendLine($"        Write-Output \"PnP restart interface=$($interfaceDevice.InstanceId) exitCode=$restartExitCode\" >> {PowerShellLiteral(wdiLog)}");
+            ps1.AppendLine($"        Write-Output \"PnP restart binding=$($bindingDevice.InstanceId) exitCode=$restartExitCode output=$($restartOutput -join ' | ')\" >> {PowerShellLiteral(wdiLog)}");
             ps1.AppendLine("    }");
             ps1.AppendLine("    $scanOutput = & pnputil.exe /scan-devices 2>&1");
             ps1.AppendLine("    $scanExitCode = $LASTEXITCODE");
             ps1.AppendLine($"    $scanOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
             ps1.AppendLine($"    Write-Output \"PnP scan after install exitCode=$scanExitCode\" >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("    $readyInterfaces = @()");
+            ps1.AppendLine("    $readyBindingCount = 0");
+            ps1.AppendLine("    $readyInstances = @()");
+            ps1.AppendLine("    $missingBindings = @($selectedReceiverBindings.Name)");
             ps1.AppendLine("    for ($attempt = 1; $attempt -le 15; $attempt++) {");
             ps1.AppendLine("        Start-Sleep -Seconds 1");
-            ps1.AppendLine("        $readyInterfaces = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
-            ps1.AppendLine("            $instanceId = $_.InstanceId");
-            ps1.AppendLine("            @($selectedReceiverInterfaceIds | Where-Object { $instanceId -match [regex]::Escape($_) }).Count -gt 0 -and $_.Service -match 'WINUSB'");
+            ps1.AppendLine("        $presentPnpDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue)");
+            ps1.AppendLine("        $bindingStates = @($selectedReceiverBindings | ForEach-Object {");
+            ps1.AppendLine("            $binding = $_");
+            ps1.AppendLine("            $matchingDevices = @($presentPnpDevices | Where-Object { $_.InstanceId -like $binding.InstancePattern -and $_.Service -match 'WINUSB' })");
+            ps1.AppendLine("            [pscustomobject]@{ Name=$binding.Name; Ready=($matchingDevices.Count -gt 0); Instances=@($matchingDevices.InstanceId) }");
             ps1.AppendLine("        })");
-            ps1.AppendLine($"        Write-Output \"WinUSB interface readiness attempt=$attempt ready=$($readyInterfaces.Count)/$($selectedReceiverInterfaceIds.Count) instances=$($readyInterfaces.InstanceId -join '|')\" >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("        if ($readyInterfaces.Count -ge $selectedReceiverInterfaceIds.Count) { break }");
-            ps1.AppendLine("        if ($attempt -eq 5 -or $attempt -eq 10) { & pnputil.exe /scan-devices | Out-Null }");
+            ps1.AppendLine("        $readyBindingCount = @($bindingStates | Where-Object Ready).Count");
+            ps1.AppendLine("        $readyInstances = @($bindingStates | Where-Object Ready | ForEach-Object { $_.Instances })");
+            ps1.AppendLine("        $missingBindings = @($bindingStates | Where-Object { -not $_.Ready } | Select-Object -ExpandProperty Name)");
+            ps1.AppendLine($"        Write-Output \"WinUSB binding readiness attempt=$attempt ready=$readyBindingCount/$($selectedReceiverBindings.Count) missing=$($missingBindings -join '|') instances=$($readyInstances -join '|')\" >> {PowerShellLiteral(wdiLog)}");
+            ps1.AppendLine("        if ($readyBindingCount -ge $selectedReceiverBindings.Count) { break }");
+            ps1.AppendLine("        if ($attempt -eq 5 -or $attempt -eq 10) {");
+            ps1.AppendLine("            $retryScanOutput = & pnputil.exe /scan-devices 2>&1");
+            ps1.AppendLine("            $retryScanExitCode = $LASTEXITCODE");
+            ps1.AppendLine($"            Write-Output \"PnP readiness rescan attempt=$attempt exitCode=$retryScanExitCode output=$($retryScanOutput -join ' | ')\" >> {PowerShellLiteral(wdiLog)}");
+            ps1.AppendLine("        }");
+            ps1.AppendLine("    }");
+            ps1.AppendLine("    $finalBindingDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
+            ps1.AppendLine("        $instanceId = $_.InstanceId");
+            ps1.AppendLine("        @($selectedReceiverBindings | Where-Object { $instanceId -like $_.InstancePattern }).Count -gt 0");
+            ps1.AppendLine("    })");
+            ps1.AppendLine("    Write-PnpSnapshot -label 'receiver-after-restart' -devices $finalBindingDevices");
+            ps1.AppendLine("    if ($readyBindingCount -lt $selectedReceiverBindings.Count) {");
+            ps1.AppendLine($"        Write-Output \"Receiver binding re-enumeration failed missing=$($missingBindings -join '|').\" >> {PowerShellLiteral(wdiLog)}");
+            ps1.AppendLine("        $resultCodes += -1");
             ps1.AppendLine("    }");
             ps1.AppendLine("}");
         }
@@ -571,13 +635,14 @@ namespace ZeroCue.DataProbe.Services
 
             string ps1Path = Path.Combine(workDir, $"zerocue_restore_{config.LogName}_drivers.ps1");
             string resultPath = Path.Combine(workDir, $"zerocue_restore_{config.LogName}_result.txt");
+            string restoreLogPath = Path.Combine(workDir, $"zerocue_restore_{config.LogName}_output.txt");
 
             try
             {
                 if (File.Exists(resultPath))
                     File.Delete(resultPath);
 
-                string ps1Content = BuildRestoreDriverScript(config, ownedPackages, resultPath);
+                string ps1Content = BuildRestoreDriverScript(config, ownedPackages, resultPath, restoreLogPath);
 
                 File.WriteAllText(ps1Path, ps1Content);
                 Log($"Created {config.LogName} {operationName} script at: {ps1Path}; identities={string.Join(',', config.HardwareIdentityValues)} packages={string.Join(',', ownedPackages)}");
@@ -636,6 +701,7 @@ namespace ZeroCue.DataProbe.Services
             }
             finally
             {
+                LogFileContents(restoreLogPath, $"{config.LogName} {operationName} output");
                 try { Directory.Delete(workDir, recursive: true); } catch { }
             }
         }
@@ -643,7 +709,8 @@ namespace ZeroCue.DataProbe.Services
         private static string BuildRestoreDriverScript(
             DriverTargetConfig config,
             IReadOnlyList<string> ownedPackages,
-            string resultPath)
+            string resultPath,
+            string restoreLogPath)
         {
             var ownedInfArray = string.Join(",", ownedPackages.Select(PowerShellLiteral));
             var targetHardwareIdArray = string.Join(",", config.HardwareIdentityValues.Select(PowerShellLiteral));
@@ -664,6 +731,7 @@ namespace ZeroCue.DataProbe.Services
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(PowerShellLiteral));
             return
+                $"try {{ Start-Transcript -LiteralPath {PowerShellLiteral(restoreLogPath)} -Force | Out-Null }} catch {{ Write-Warning \"Could not start restore transcript: $($_.Exception.Message)\" }}\r\n" +
                 BuildCorsairShutdownScript() +
                 "Start-Sleep -Seconds 3\r\n" +
                 $"$ownedInfs = @({ownedInfArray})\r\n" +
@@ -698,7 +766,10 @@ namespace ZeroCue.DataProbe.Services
                 "} | Select-Object -ExpandProperty InstanceId -Unique)\r\n" +
                 "$initialState = @($targetDevices | Sort-Object InstanceId | ForEach-Object {\r\n" +
                 "    $driverInf = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data\r\n" +
-                "    \"instance=$($_.InstanceId);status=$($_.Status);class=$($_.Class);service=$($_.Service);driverInf=$driverInf\"\r\n" +
+                "    $parent = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_Parent' -ErrorAction SilentlyContinue).Data\r\n" +
+                "    $problemCode = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_ProblemCode' -ErrorAction SilentlyContinue).Data\r\n" +
+                "    $hardwareIds = ((Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_HardwareIds' -ErrorAction SilentlyContinue).Data -join ';')\r\n" +
+                "    \"instance=$($_.InstanceId);friendlyName=$($_.FriendlyName);status=$($_.Status);class=$($_.Class);service=$($_.Service);driverInf=$driverInf;problemCode=$problemCode;parent=$parent;hardwareIds=$hardwareIds\"\r\n" +
                 "})\r\n" +
                 "$initialWinUsbDevices = @($presentTargetDevicesBefore | Where-Object { $_.Service -match 'WINUSB' })\r\n" +
                 "$legacyCandidates = @(Get-ChildItem -Path (Join-Path $env:windir 'INF\\oem*.inf') -File -ErrorAction SilentlyContinue)\r\n" +
@@ -834,7 +905,10 @@ namespace ZeroCue.DataProbe.Services
                 "})\r\n" +
                 "$finalState = @($finalDevices | Sort-Object InstanceId | ForEach-Object {\r\n" +
                 "    $driverInf = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data\r\n" +
-                "    \"instance=$($_.InstanceId);status=$($_.Status);class=$($_.Class);service=$($_.Service);driverInf=$driverInf\"\r\n" +
+                "    $parent = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_Parent' -ErrorAction SilentlyContinue).Data\r\n" +
+                "    $problemCode = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_ProblemCode' -ErrorAction SilentlyContinue).Data\r\n" +
+                "    $hardwareIds = ((Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_HardwareIds' -ErrorAction SilentlyContinue).Data -join ';')\r\n" +
+                "    \"instance=$($_.InstanceId);friendlyName=$($_.FriendlyName);status=$($_.Status);class=$($_.Class);service=$($_.Service);driverInf=$driverInf;problemCode=$problemCode;parent=$parent;hardwareIds=$hardwareIds\"\r\n" +
                 "})\r\n" +
                 "Stop-Process -Name 'wdi-simple' -Force -ErrorAction SilentlyContinue\r\n" +
                 "Stop-Process -Name 'installer_x64' -Force -ErrorAction SilentlyContinue\r\n" +
@@ -852,7 +926,8 @@ namespace ZeroCue.DataProbe.Services
                 $"Write-Output \"restoredInterfaces=$($restoredInterfaceHardwareIds -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"missingInterfaces=$($missingInterfaceHardwareIds -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"before=$($initialState -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
-                $"Write-Output \"after=$($finalState -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n";
+                $"Write-Output \"after=$($finalState -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
+                "try { Stop-Transcript | Out-Null } catch { }\r\n";
         }
 
         private static Dictionary<string, string> ParseKeyValueResult(string path)
@@ -1097,7 +1172,8 @@ namespace ZeroCue.DataProbe.Services
                     "$devices = Get-PnpDevice | Where-Object {\r\n" +
                     "    ($_.InstanceId -match 'VID_1B1C&PID_3A08') -or\r\n" +
                     "    ($_.InstanceId -match 'VID_1B1C&PID_3A09') -or\r\n" +
-                    "    ($_.InstanceId -match 'VID_2E95&PID_434E')\r\n" +
+                    "    ($_.InstanceId -match 'VID_2E95&PID_434E') -or\r\n" +
+                    "    ($_.InstanceId -match 'VID_2E95&PID_5046')\r\n" +
                     "} | Where-Object {\r\n" +
                     "    $_.InstanceId -notmatch 'PID_3A05'\r\n" +
                     "} | ForEach-Object {\r\n" +

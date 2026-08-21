@@ -86,10 +86,15 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("$supportedIdentities = @($targets | ForEach-Object { 'VID_' + $_.VidValue + '&PID_' + $_.PidValue })");
                 ps1.AppendLine("$selectedTarget = $null");
                 ps1.AppendLine("$selectedDevices = @()");
-                ps1.AppendLine("foreach ($candidateTarget in $targets) {");
-                ps1.AppendLine("    $candidatePattern = \"USB\\VID_$($candidateTarget.VidValue)&PID_$($candidateTarget.PidValue)*\"");
-                ps1.AppendLine("    $candidateDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $candidatePattern })");
-                ps1.AppendLine("    if ($candidateDevices.Count -gt 0) { $selectedTarget = $candidateTarget; $selectedDevices = $candidateDevices; break }");
+                ps1.AppendLine("for ($selectionAttempt = 1; $selectionAttempt -le 10 -and $null -eq $selectedTarget; $selectionAttempt++) {");
+                ps1.AppendLine("    if ($selectionAttempt -eq 1 -or $selectionAttempt -eq 5) { & pnputil.exe /scan-devices | Out-Null }");
+                ps1.AppendLine("    foreach ($candidateTarget in $targets) {");
+                ps1.AppendLine("        $candidatePattern = \"USB\\VID_$($candidateTarget.VidValue)&PID_$($candidateTarget.PidValue)*\"");
+                ps1.AppendLine("        $candidateDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $candidatePattern })");
+                ps1.AppendLine("        if ($candidateDevices.Count -gt 0) { $selectedTarget = $candidateTarget; $selectedDevices = $candidateDevices; break }");
+                ps1.AppendLine("    }");
+                ps1.AppendLine($"    if ($null -eq $selectedTarget) {{ Write-Output \"Driver target selection attempt=$selectionAttempt/10 found=0 identities=$($supportedIdentities -join ',')\" >> {PowerShellLiteral(wdiLog)} }}");
+                ps1.AppendLine("    if ($null -eq $selectedTarget -and $selectionAttempt -lt 10) { Start-Sleep -Seconds 1 }");
                 ps1.AppendLine("}");
                 ps1.AppendLine("if ($null -eq $selectedTarget) {");
                 ps1.AppendLine($"    Write-Output \"No present {config.DisplayName} matched supported identities: $($supportedIdentities -join ', ').\" >> {PowerShellLiteral(wdiLog)}");
@@ -215,6 +220,11 @@ namespace ZeroCue.DataProbe.Services
                     }
                 }
                 ps1.AppendLine("if ($migrationFailures -gt 0) { $resultCodes += -1 }");
+
+                if (target == DriverTarget.Receiver)
+                {
+                    AppendReceiverInterfaceReenumerationScript(ps1, config, wdiLog);
+                }
 
                 ps1.AppendLine("$publishedInfsAfter = @(Get-PublishedInfNames)");
                 ps1.AppendLine("$createdInfs = @($publishedInfsAfter | Where-Object { $publishedInfsBefore -notcontains $_ })");
@@ -418,6 +428,51 @@ namespace ZeroCue.DataProbe.Services
             ps1.AppendLine("}");
         }
 
+        private static void AppendReceiverInterfaceReenumerationScript(
+            StringBuilder ps1,
+            DriverTargetConfig config,
+            string wdiLog)
+        {
+            var receiverInterfaceIds = config.Variants
+                .SelectMany(variant => variant.Bindings
+                    .Where(binding => binding.InterfaceId.HasValue)
+                    .Select(binding =>
+                        $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{binding.InterfaceId!.Value:X2}"))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            string interfaceIdValues = string.Join(",", receiverInterfaceIds.Select(PowerShellLiteral));
+
+            ps1.AppendLine($"$selectedReceiverInterfaceIds = @({interfaceIdValues}) | Where-Object {{ $_ -like \"VID_$selectedVidValue&PID_$selectedPidValue*\" }}");
+            ps1.AppendLine("if ($selectedReceiverInterfaceIds.Count -gt 0 -and $resultCodes.Count -gt 0 -and $resultCodes -notcontains -1) {");
+            ps1.AppendLine($"    Write-Output 'Starting exact receiver interface re-enumeration after WinUSB installation.' >> {PowerShellLiteral(wdiLog)}");
+            ps1.AppendLine("    $selectedInterfaceDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
+            ps1.AppendLine("        $instanceId = $_.InstanceId");
+            ps1.AppendLine("        @($selectedReceiverInterfaceIds | Where-Object { $instanceId -match [regex]::Escape($_) }).Count -gt 0");
+            ps1.AppendLine("    })");
+            ps1.AppendLine("    foreach ($interfaceDevice in $selectedInterfaceDevices | Sort-Object InstanceId) {");
+            ps1.AppendLine("        $restartOutput = & pnputil.exe /restart-device $interfaceDevice.InstanceId 2>&1");
+            ps1.AppendLine("        $restartExitCode = $LASTEXITCODE");
+            ps1.AppendLine($"        $restartOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
+            ps1.AppendLine($"        Write-Output \"PnP restart interface=$($interfaceDevice.InstanceId) exitCode=$restartExitCode\" >> {PowerShellLiteral(wdiLog)}");
+            ps1.AppendLine("    }");
+            ps1.AppendLine("    $scanOutput = & pnputil.exe /scan-devices 2>&1");
+            ps1.AppendLine("    $scanExitCode = $LASTEXITCODE");
+            ps1.AppendLine($"    $scanOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
+            ps1.AppendLine($"    Write-Output \"PnP scan after install exitCode=$scanExitCode\" >> {PowerShellLiteral(wdiLog)}");
+            ps1.AppendLine("    $readyInterfaces = @()");
+            ps1.AppendLine("    for ($attempt = 1; $attempt -le 15; $attempt++) {");
+            ps1.AppendLine("        Start-Sleep -Seconds 1");
+            ps1.AppendLine("        $readyInterfaces = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
+            ps1.AppendLine("            $instanceId = $_.InstanceId");
+            ps1.AppendLine("            @($selectedReceiverInterfaceIds | Where-Object { $instanceId -match [regex]::Escape($_) }).Count -gt 0 -and $_.Service -match 'WINUSB'");
+            ps1.AppendLine("        })");
+            ps1.AppendLine($"        Write-Output \"WinUSB interface readiness attempt=$attempt ready=$($readyInterfaces.Count)/$($selectedReceiverInterfaceIds.Count) instances=$($readyInterfaces.InstanceId -join '|')\" >> {PowerShellLiteral(wdiLog)}");
+            ps1.AppendLine("        if ($readyInterfaces.Count -ge $selectedReceiverInterfaceIds.Count) { break }");
+            ps1.AppendLine("        if ($attempt -eq 5 -or $attempt -eq 10) { & pnputil.exe /scan-devices | Out-Null }");
+            ps1.AppendLine("    }");
+            ps1.AppendLine("}");
+        }
+
         private async Task<bool> ValidateReceiverWinUsbTopologyAsync(
             string vidValue,
             string pidValue,
@@ -437,46 +492,60 @@ namespace ZeroCue.DataProbe.Services
                 return false;
             }
 
-            Log($"Receiver topology validation start variant={driverVariant.Name} runtimeVariant={receiverIdentity.Variant} experimental={receiverIdentity.IsExperimental} VID=0x{vid:X4} PID=0x{pid:X4}.");
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            using var runtimeTransport = new WirelessDongleWinUsbTransport(
-                message => Log($"receiver validation: {message}"),
-                WirelessWinUsbInterfaceTarget.RuntimeMi04,
-                logReadPayloads: false,
-                receiverIdentity: receiverIdentity);
-            using var radioTransport = new WirelessDongleWinUsbTransport(
-                message => Log($"receiver validation: {message}"),
-                WirelessWinUsbInterfaceTarget.RadioMi03,
-                logReadPayloads: false,
-                receiverIdentity: receiverIdentity);
+            const int maxAttempts = 20;
+            Log($"Receiver topology validation start variant={driverVariant.Name} runtimeVariant={receiverIdentity.Variant} experimental={receiverIdentity.IsExperimental} VID=0x{vid:X4} PID=0x{pid:X4} attempts={maxAttempts} delayMs=1000.");
 
-            try
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                if (!await runtimeTransport.ConnectAsync(timeout.Token))
+                bool runtimeReady = false;
+                bool radioReady = false;
+                Log($"Receiver topology validation attempt={attempt}/{maxAttempts}.");
+
+                try
                 {
-                    Log("Receiver driver validation failed: MI_04 does not expose 64-byte OUT 0x02 / IN 0x82 pipes through WinUSB.");
-                    return false;
+                    using (var runtimeTransport = new WirelessDongleWinUsbTransport(
+                        message => Log($"receiver validation: {message}"),
+                        WirelessWinUsbInterfaceTarget.RuntimeMi04,
+                        logReadPayloads: false,
+                        receiverIdentity: receiverIdentity))
+                    {
+                        using var runtimeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        runtimeReady = await runtimeTransport.ConnectAsync(runtimeTimeout.Token);
+                        await runtimeTransport.DisconnectAsync();
+                    }
+
+                    if (runtimeReady)
+                    {
+                        using var radioTransport = new WirelessDongleWinUsbTransport(
+                            message => Log($"receiver validation: {message}"),
+                            WirelessWinUsbInterfaceTarget.RadioMi03,
+                            logReadPayloads: false,
+                            receiverIdentity: receiverIdentity);
+                        using var radioTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                        radioReady = await radioTransport.ConnectAsync(radioTimeout.Token);
+                        await radioTransport.DisconnectAsync();
+                    }
+                }
+                catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is TimeoutException || ex is OperationCanceledException)
+                {
+                    Log($"Receiver topology validation attempt={attempt} transient failure: {ex.Message}");
                 }
 
-                if (!await radioTransport.ConnectAsync(timeout.Token))
+                Log($"Receiver topology validation attempt={attempt} runtimeMi04={runtimeReady} radioMi03={radioReady}.");
+                if (runtimeReady && radioReady)
                 {
-                    Log("Receiver driver validation failed: MI_03 does not expose a 64-byte IN 0x81 pipe through WinUSB.");
-                    return false;
+                    Log($"Receiver driver validation succeeded variant={receiverIdentity.Variant} experimental={receiverIdentity.IsExperimental} VID=0x{vid:X4} PID=0x{pid:X4} for MI_04 control and MI_03 input pipes.");
+                    return true;
                 }
 
-                Log($"Receiver driver validation succeeded variant={receiverIdentity.Variant} experimental={receiverIdentity.IsExperimental} VID=0x{vid:X4} PID=0x{pid:X4} for MI_04 control and MI_03 input pipes.");
-                return true;
+                if (attempt < maxAttempts)
+                {
+                    await Task.Delay(1000);
+                }
             }
-            catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is TimeoutException || ex is OperationCanceledException)
-            {
-                Log($"Receiver driver validation failed: {ex.Message}");
-                return false;
-            }
-            finally
-            {
-                await radioTransport.DisconnectAsync();
-                await runtimeTransport.DisconnectAsync();
-            }
+
+            Log("Receiver driver validation failed after re-enumeration retries: MI_04 must expose 64-byte OUT 0x02 / IN 0x82 pipes and MI_03 must expose a 64-byte IN 0x81 pipe through WinUSB.");
+            return false;
         }
 
         private Task<bool> RestoreDefaultDriversAsync(DriverTarget target)
@@ -587,17 +656,26 @@ namespace ZeroCue.DataProbe.Services
                         $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{binding.InterfaceId:X2}")))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(PowerShellLiteral));
+            var restorableInterfaceHardwareIdArray = string.Join(",", config.Variants
+                .SelectMany(variant => variant.Bindings
+                    .Where(binding => binding.InterfaceId.HasValue)
+                    .Select(binding =>
+                        $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{binding.InterfaceId!.Value:X2}"))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(PowerShellLiteral));
             return
                 BuildCorsairShutdownScript() +
                 "Start-Sleep -Seconds 3\r\n" +
                 $"$ownedInfs = @({ownedInfArray})\r\n" +
                 $"$legacyHardwareIds = @({legacyHardwareIdArray})\r\n" +
+                $"$restorableInterfaceHardwareIds = @({restorableInterfaceHardwareIdArray})\r\n" +
                 $"$targetHardwareIds = @({targetHardwareIdArray})\r\n" +
                 "$verifiedInfs = @()\r\n" +
                 "$removedCount = 0\r\n" +
                 "$removedDeviceCount = 0\r\n" +
                 "$missingCount = 0\r\n" +
                 "$failureCount = 0\r\n" +
+                "$warningCount = 0\r\n" +
                 "$legacyPackageCount = 0\r\n" +
                 "$targetDevices = @(Get-PnpDevice -ErrorAction SilentlyContinue | Where-Object {\r\n" +
                 "    $instanceId = $_.InstanceId\r\n" +
@@ -605,11 +683,24 @@ namespace ZeroCue.DataProbe.Services
                 "    foreach ($targetHardwareId in $targetHardwareIds) { if ($instanceId -match [regex]::Escape($targetHardwareId)) { $hasTargetId = $true; break } }\r\n" +
                 "    $hasTargetId\r\n" +
                 "})\r\n" +
+                "$presentTargetDevicesBefore = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {\r\n" +
+                "    $instanceId = $_.InstanceId\r\n" +
+                "    $hasTargetId = $false\r\n" +
+                "    foreach ($targetHardwareId in $targetHardwareIds) { if ($instanceId -match [regex]::Escape($targetHardwareId)) { $hasTargetId = $true; break } }\r\n" +
+                "    $hasTargetId\r\n" +
+                "})\r\n" +
+                "$expectedPresentInterfaceHardwareIds = @($restorableInterfaceHardwareIds | Where-Object {\r\n" +
+                "    $hardwareId = $_\r\n" +
+                "    @($presentTargetDevicesBefore | Where-Object { $_.InstanceId -match [regex]::Escape($hardwareId) }).Count -gt 0\r\n" +
+                "})\r\n" +
+                "$compositeParentInstanceIds = @($presentTargetDevicesBefore | Where-Object {\r\n" +
+                "    $_.InstanceId -notmatch '&MI_[0-9A-F]{2}' -and $_.Service -match 'usbccgp'\r\n" +
+                "} | Select-Object -ExpandProperty InstanceId -Unique)\r\n" +
                 "$initialState = @($targetDevices | Sort-Object InstanceId | ForEach-Object {\r\n" +
                 "    $driverInf = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data\r\n" +
                 "    \"instance=$($_.InstanceId);status=$($_.Status);class=$($_.Class);service=$($_.Service);driverInf=$driverInf\"\r\n" +
                 "})\r\n" +
-                "$initialWinUsbDevices = @($targetDevices | Where-Object { $_.Service -match 'WINUSB' })\r\n" +
+                "$initialWinUsbDevices = @($presentTargetDevicesBefore | Where-Object { $_.Service -match 'WINUSB' })\r\n" +
                 "$legacyCandidates = @(Get-ChildItem -Path (Join-Path $env:windir 'INF\\oem*.inf') -File -ErrorAction SilentlyContinue)\r\n" +
                 "foreach ($infFile in $legacyCandidates) {\r\n" +
                 "    $content = Get-Content -LiteralPath $infFile.FullName -Raw -ErrorAction SilentlyContinue\r\n" +
@@ -660,29 +751,80 @@ namespace ZeroCue.DataProbe.Services
                 "    $driverInf = (Get-PnpDeviceProperty -InstanceId $device.InstanceId -KeyName 'DEVPKEY_Device_DriverInfPath' -ErrorAction SilentlyContinue).Data\r\n" +
                 "    if ($verifiedInfs -contains $driverInf) { $device }\r\n" +
                 "})\r\n" +
-                "$ownedDevices | Sort-Object @{Expression={$_.InstanceId.Length}; Descending=$true} | ForEach-Object {\r\n" +
-                "    pnputil /remove-device \"$($_.InstanceId)\"\r\n" +
-                "    if ($LASTEXITCODE -eq 0) { $removedDeviceCount++ } else { $failureCount++ }\r\n" +
+                "$ownedDeviceInstanceIds = @($ownedDevices | Select-Object -ExpandProperty InstanceId -Unique)\r\n" +
+                "foreach ($ownedDeviceInstanceId in @($ownedDeviceInstanceIds | Sort-Object { $_.Length } -Descending)) {\r\n" +
+                "    $currentOwnedDevice = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -eq $ownedDeviceInstanceId })\r\n" +
+                "    if ($currentOwnedDevice.Count -eq 0) {\r\n" +
+                "        Write-Warning \"Driver interface already re-enumerated before removal: $ownedDeviceInstanceId\"\r\n" +
+                "        $warningCount++\r\n" +
+                "        continue\r\n" +
+                "    }\r\n" +
+                "    $removeDeviceOutput = & pnputil /remove-device $ownedDeviceInstanceId 2>&1\r\n" +
+                "    $removeDeviceExitCode = $LASTEXITCODE\r\n" +
+                "    $removeDeviceOutput | Write-Output\r\n" +
+                "    if ($removeDeviceExitCode -eq 0) {\r\n" +
+                "        $removedDeviceCount++\r\n" +
+                "    } else {\r\n" +
+                "        $deviceAfterFailedRemoval = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -eq $ownedDeviceInstanceId })\r\n" +
+                "        if ($deviceAfterFailedRemoval.Count -eq 0 -or $deviceAfterFailedRemoval.Service -notmatch 'WINUSB') {\r\n" +
+                "            Write-Warning \"Driver interface changed during removal and is no longer on WinUSB: $ownedDeviceInstanceId\"\r\n" +
+                "            $warningCount++\r\n" +
+                "        } else {\r\n" +
+                "            $failureCount++\r\n" +
+                "        }\r\n" +
+                "    }\r\n" +
                 "}\r\n" +
                 "foreach ($infName in $verifiedInfs) {\r\n" +
-                "    pnputil /delete-driver $infName /uninstall /force\r\n" +
-                "    if ($LASTEXITCODE -eq 0) { $removedCount++ } else { $failureCount++ }\r\n" +
+                "    $deleteDriverOutput = & pnputil /delete-driver $infName /uninstall /force 2>&1\r\n" +
+                "    $deleteDriverExitCode = $LASTEXITCODE\r\n" +
+                "    $deleteDriverOutput | Write-Output\r\n" +
+                "    $infPathAfterDelete = Join-Path (Join-Path $env:windir 'INF') $infName\r\n" +
+                "    if ($deleteDriverExitCode -eq 0 -or -not (Test-Path -LiteralPath $infPathAfterDelete -PathType Leaf)) {\r\n" +
+                "        $removedCount++\r\n" +
+                "        if ($deleteDriverExitCode -ne 0) { $warningCount++ }\r\n" +
+                "    } else {\r\n" +
+                "        $failureCount++\r\n" +
+                "    }\r\n" +
+                "}\r\n" +
+                "pnputil /scan-devices | Out-Null\r\n" +
+                "foreach ($compositeParentInstanceId in $compositeParentInstanceIds) {\r\n" +
+                "    $restartParentOutput = & pnputil.exe /restart-device $compositeParentInstanceId 2>&1\r\n" +
+                "    $restartParentExitCode = $LASTEXITCODE\r\n" +
+                "    $restartParentOutput | Write-Output\r\n" +
+                "    if ($restartParentExitCode -ne 0) { $warningCount++ }\r\n" +
                 "}\r\n" +
                 "pnputil /scan-devices | Out-Null\r\n" +
                 "$remainingWinUsbDevices = @()\r\n" +
-                "for ($attempt = 0; $attempt -lt 6; $attempt++) {\r\n" +
-                "    Start-Sleep -Seconds 2\r\n" +
-                "    $remainingWinUsbDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {\r\n" +
+                "$restoredInterfaceHardwareIds = @()\r\n" +
+                "$missingInterfaceHardwareIds = @($expectedPresentInterfaceHardwareIds)\r\n" +
+                "for ($attempt = 1; $attempt -le 20; $attempt++) {\r\n" +
+                "    Start-Sleep -Seconds 1\r\n" +
+                "    $presentTargetDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {\r\n" +
                 "        $instanceId = $_.InstanceId\r\n" +
                 "        $hasTargetId = $false\r\n" +
                 "        foreach ($targetHardwareId in $targetHardwareIds) { if ($instanceId -match [regex]::Escape($targetHardwareId)) { $hasTargetId = $true; break } }\r\n" +
-                "        $hasTargetId -and $_.Service -match 'WINUSB'\r\n" +
+                "        $hasTargetId\r\n" +
                 "    })\r\n" +
-                "    if ($remainingWinUsbDevices.Count -eq 0) { break }\r\n" +
+                "    $remainingWinUsbDevices = @($presentTargetDevices | Where-Object { $_.Service -match 'WINUSB' })\r\n" +
+                "    $restoredInterfaceHardwareIds = @($expectedPresentInterfaceHardwareIds | Where-Object {\r\n" +
+                "        $hardwareId = $_\r\n" +
+                "        @($presentTargetDevices | Where-Object { $_.InstanceId -match [regex]::Escape($hardwareId) -and $_.Service -notmatch 'WINUSB' }).Count -gt 0\r\n" +
+                "    })\r\n" +
+                "    $missingInterfaceHardwareIds = @($expectedPresentInterfaceHardwareIds | Where-Object { $restoredInterfaceHardwareIds -notcontains $_ })\r\n" +
+                "    Write-Output \"Driver restore readiness attempt=$attempt remainingWinUsb=$($remainingWinUsbDevices.Count) restoredInterfaces=$($restoredInterfaceHardwareIds.Count)/$($expectedPresentInterfaceHardwareIds.Count) missing=$($missingInterfaceHardwareIds -join ',')\"\r\n" +
+                "    if ($remainingWinUsbDevices.Count -eq 0 -and $missingInterfaceHardwareIds.Count -eq 0) { break }\r\n" +
+                "    if ($attempt -eq 5 -or $attempt -eq 10 -or $attempt -eq 15) {\r\n" +
+                "        foreach ($compositeParentInstanceId in $compositeParentInstanceIds) { & pnputil.exe /restart-device $compositeParentInstanceId | Out-Null }\r\n" +
+                "        pnputil /scan-devices | Out-Null\r\n" +
+                "    }\r\n" +
                 "}\r\n" +
                 "if ($remainingWinUsbDevices.Count -gt 0) {\r\n" +
                 "    Write-Warning \"WinUSB is still bound to: $($remainingWinUsbDevices.InstanceId -join ', ')\"\r\n" +
                 "    $failureCount += $remainingWinUsbDevices.Count\r\n" +
+                "}\r\n" +
+                "if ($missingInterfaceHardwareIds.Count -gt 0) {\r\n" +
+                "    Write-Warning \"Original driver interfaces did not return: $($missingInterfaceHardwareIds -join ', ')\"\r\n" +
+                "    $failureCount += $missingInterfaceHardwareIds.Count\r\n" +
                 "}\r\n" +
                 "$finalDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {\r\n" +
                 "    $instanceId = $_.InstanceId\r\n" +
@@ -703,8 +845,12 @@ namespace ZeroCue.DataProbe.Services
                 $"Write-Output \"legacy=$legacyPackageCount\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"missing=$missingCount\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"failures=$failureCount\" >> {PowerShellLiteral(resultPath)}\r\n" +
+                $"Write-Output \"warnings=$warningCount\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"packages=$($verifiedInfs -join ',')\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"remaining=$($remainingWinUsbDevices.InstanceId -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
+                $"Write-Output \"expectedInterfaces=$($expectedPresentInterfaceHardwareIds -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
+                $"Write-Output \"restoredInterfaces=$($restoredInterfaceHardwareIds -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
+                $"Write-Output \"missingInterfaces=$($missingInterfaceHardwareIds -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"before=$($initialState -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n" +
                 $"Write-Output \"after=$($finalState -join '|')\" >> {PowerShellLiteral(resultPath)}\r\n";
         }

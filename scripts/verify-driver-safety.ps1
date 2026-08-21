@@ -66,11 +66,22 @@ $requiredFragments = @(
     '$remainingWinUsbDevices',
     '$targetHardwareIds',
     'Get-PnpDevice -PresentOnly',
-    '$hasTargetId -and $_.Service -match ''WINUSB''',
+    '$presentTargetDevicesBefore',
+    '$presentTargetDevices',
+    '$remainingWinUsbDevices = @($presentTargetDevices | Where-Object { $_.Service -match ''WINUSB'' })',
     '$failureCount += $remainingWinUsbDevices.Count',
+    '$expectedPresentInterfaceHardwareIds',
+    '$restoredInterfaceHardwareIds',
+    '$missingInterfaceHardwareIds',
+    '$failureCount += $missingInterfaceHardwareIds.Count',
+    '$compositeParentInstanceIds',
+    'pnputil.exe /restart-device $compositeParentInstanceId',
     '$verifiedInfs.Count -eq 0 -and $initialWinUsbDevices.Count -gt 0',
     'packages=$($verifiedInfs -join '','')',
-    'remaining=$($remainingWinUsbDevices.InstanceId -join ''|'')'
+    'remaining=$($remainingWinUsbDevices.InstanceId -join ''|'')',
+    'expectedInterfaces=$($expectedPresentInterfaceHardwareIds -join ''|'')',
+    'restoredInterfaces=$($restoredInterfaceHardwareIds -join ''|'')',
+    'missingInterfaces=$($missingInterfaceHardwareIds -join ''|'')'
 )
 
 foreach ($fragment in $requiredFragments) {
@@ -136,6 +147,8 @@ $requiredPortableTargets = @(
     'new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")',
     'manifestHardwareIds.IsSubsetOf(expectedHardwareIds)',
     '$candidateDevices.Count -gt 0',
+    '$selectionAttempt -le 10',
+    'Driver target selection attempt=$selectionAttempt/10',
     'if ($interfaceId -ge 0) { $argsArray += @(''-i'', $interfaceId) }',
     "'-o', '15000'",
     'taskkill.exe /PID $proc.Id /T /F',
@@ -146,10 +159,14 @@ $requiredPortableTargets = @(
     'ValidateReceiverWinUsbTopologyAsync(selectedVid, selectedPid, selectedVariant!)',
     'ScopeToIdentity(selectedVid, selectedPid)',
     'operationName: "automatic rollback"',
+    'AppendReceiverInterfaceReenumerationScript(ps1, config, wdiLog)',
+    'pnputil.exe /restart-device $interfaceDevice.InstanceId',
+    'Receiver topology validation attempt={attempt}/{maxAttempts}',
+    'await runtimeTransport.DisconnectAsync();',
     'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} install")',
     'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} {operationName}")',
-    'MI_04 does not expose 64-byte OUT 0x02 / IN 0x82 pipes through WinUSB.',
-    'MI_03 does not expose a 64-byte IN 0x81 pipe through WinUSB.'
+    'MI_04 must expose 64-byte OUT 0x02 / IN 0x82 pipes',
+    'MI_03 must expose a 64-byte IN 0x81 pipe through WinUSB.'
 )
 
 foreach ($fragment in $requiredPortableTargets) {
@@ -191,7 +208,13 @@ $requiredV1RuntimeFragments = @(
     'WirelessReceiverIdentities.Any',
     'receiverIdentity: receiverIdentity',
     'SelectedReceiverIdentity = candidate.Identity',
-    'receiverIdentity: selectedReceiverIdentity'
+    'receiverIdentity: selectedReceiverIdentity',
+    'IsTargetCompatibleCandidate',
+    'Ignoring non-interface WinUSB candidate',
+    'candidate.Identity.IsExperimental',
+    'candidate.Identity.ProductId == DeviceProfile.WirelessBasePid',
+    'WirelessWinUsbInterfaceTarget.RadioMi03 =>',
+    'WirelessWinUsbInterfaceTarget.RuntimeMi04 =>'
 )
 
 $runtimeSources = $source + $profileSource + $transportSource + $probeSource

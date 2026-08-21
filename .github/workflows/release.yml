@@ -75,23 +75,33 @@ jobs:
           @"
           ZeroCue public alpha for Windows x64.
 
-          This build adds an experimental wireless path for the original SCUF
-          PC Controller Dongle while preserving the existing V2 support:
+          This build fixes WinUSB re-enumeration and driver recovery for the
+          experimental original SCUF PC Controller Dongle while preserving the
+          existing V2 support:
 
           - Detects the experimental V1 dongle as VID_2E95 / PID_434E and installs
             WinUSB only on MI_04 for control and MI_03 for wireless input.
           - Never replaces the V1 MI_00 interface or USB composite parent, keeping
             the official Scufdriver6 binding outside ZeroCue's scope.
-          - Validates the exact V1/V2 receiver's real 64-byte endpoints after
-            installation before attempting the existing V2 wireless protocol.
+          - Rescans and briefly waits for a supported receiver when Windows is
+            still enumerating it as the elevated installation begins.
+          - Restarts and rescans only the selected receiver interfaces after driver
+            installation, then waits for both WinUSB interfaces to re-enumerate.
+          - Retries endpoint validation and closes MI_04 before opening MI_03 so
+            validation cannot block itself while Windows publishes new paths.
+          - Rejects composite-parent fallback paths for MI_03/MI_04 on composite
+            receivers, avoiding misleading WinUSB errors from the USB parent.
           - Automatically rolls back the exact receiver identity if installation
             is partial or its endpoint topology is incompatible.
           - Restores only verified ZeroCue or strictly scoped Zadig/libwdi WinUSB
-            packages, then confirms that no selected receiver interface remains
-            on WinUSB so the official SCUF/iCUE drivers can bind again.
+            packages, restarts the unchanged composite parent, and waits until all
+            previously present interfaces return on their original drivers.
+          - Treats a sibling interface disappearing during PnP re-enumeration as a
+            recoverable transition while still failing if WinUSB remains active or
+            any original interface does not return.
           - Adds receiver variant, experimental status, VID/PID, PnP driver state,
-            endpoints, app version, OS, architecture, and rollback results to the
-            diagnostic logs for this hardware trial.
+            re-enumeration attempts, endpoints, app version, OS, architecture, and
+            detailed rollback readiness to the diagnostic logs.
 
           ViGEmBus 1.22.0 must be installed before ZeroCue's WinUSB driver. Driver
           installation is required for the connection mode you use: install the

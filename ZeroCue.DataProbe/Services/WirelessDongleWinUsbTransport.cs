@@ -65,9 +65,12 @@ namespace ZeroCue.DataProbe.Services
             var receiverIdentities = _receiverIdentity == null
                 ? DeviceProfile.WirelessReceiverIdentities
                 : new[] { _receiverIdentity };
-            LogTransport($"Enumerating WinUSB/USB interface candidates profile={DeviceProfile.Name} identities={string.Join(',', receiverIdentities.Select(FormatIdentity))} scope={(_receiverIdentity == null ? "all" : "exact")} target={_interfaceTarget} requiredControlPipes OUT=0x{DeviceProfile.WinUsbOutPipe:X2} IN=0x{DeviceProfile.WinUsbInPipe:X2} reportSize={DeviceProfile.ReportSize}.");
+            string requiredPipes = _interfaceTarget == WirelessWinUsbInterfaceTarget.RadioMi03
+                ? "IN=0x81 (OUT=0x01 optional)"
+                : $"OUT=0x{DeviceProfile.WinUsbOutPipe:X2} IN=0x{DeviceProfile.WinUsbInPipe:X2}";
+            LogTransport($"Enumerating WinUSB/USB interface candidates profile={DeviceProfile.Name} identities={string.Join(',', receiverIdentities.Select(FormatIdentity))} scope={(_receiverIdentity == null ? "all" : "exact")} target={_interfaceTarget} requiredPipes={requiredPipes} reportSize={DeviceProfile.ReportSize}.");
 
-            var candidates = receiverIdentities
+            var enumeratedCandidates = receiverIdentities
                 .SelectMany(identity => WinUsbInterop.EnumerateUsbDevicePaths(
                         $"vid_{identity.VendorId:x4}",
                         $"pid_{identity.ProductId:x4}",
@@ -75,6 +78,15 @@ namespace ZeroCue.DataProbe.Services
                     .Select(path => new ReceiverCandidate(path, identity)))
                 .GroupBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.First())
+                .ToList();
+
+            foreach (var excludedCandidate in enumeratedCandidates.Where(candidate => !IsTargetCompatibleCandidate(candidate)))
+            {
+                LogTransport($"Ignoring non-interface WinUSB candidate target={_interfaceTarget} identity={FormatIdentity(excludedCandidate.Identity)} path={excludedCandidate.Path}");
+            }
+
+            var candidates = enumeratedCandidates
+                .Where(IsTargetCompatibleCandidate)
                 .OrderBy(candidate => CandidatePriority(candidate.Path))
                 .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -103,6 +115,25 @@ namespace ZeroCue.DataProbe.Services
 
             LogTransport("WirelessWinUsbControlPipesNotFound: no candidate exposed a supported 64-byte OUT/IN pipe pair.");
             return false;
+        }
+
+        private bool IsTargetCompatibleCandidate(ReceiverCandidate candidate)
+        {
+            bool requiresExactCompositeInterface = candidate.Identity.IsExperimental ||
+                candidate.Identity.ProductId == DeviceProfile.WirelessBasePid;
+            if (!requiresExactCompositeInterface)
+            {
+                return true;
+            }
+
+            return _interfaceTarget switch
+            {
+                WirelessWinUsbInterfaceTarget.RadioMi03 =>
+                    candidate.Path.IndexOf("mi_03", StringComparison.OrdinalIgnoreCase) >= 0,
+                WirelessWinUsbInterfaceTarget.RuntimeMi04 =>
+                    candidate.Path.IndexOf("mi_04", StringComparison.OrdinalIgnoreCase) >= 0,
+                _ => true
+            };
         }
 
         private int CandidatePriority(string path)

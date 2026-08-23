@@ -92,7 +92,7 @@ namespace ZeroCue.DataProbe.Services
                 if (!autoConnect)
                 {
                     SetWaitingForControllerStatus();
-                    LogInput($"[SYSTEM] Iniciando busqueda USB cableada por perfil: {DeviceProfile.Name} VID=0x{DeviceProfile.VendorId:X4} PIDs={string.Join('/', DeviceProfile.WiredPids.Select(pid => $"0x{pid:X4}"))} reportSize={DeviceProfile.ReportSize}.");
+                    LogInput($"[SYSTEM] Iniciando busqueda USB cableada por perfil: {DeviceProfile.Name} identities={string.Join(',', DeviceProfile.WiredDeviceIdentities.Select(identity => $"{identity.VendorId:X4}:{identity.ProductId:X4}{(identity.IsExperimental ? "[experimental]" : string.Empty)}"))} reportSize={DeviceProfile.ReportSize}.");
                 }
 
                 await Task.Run(async () =>
@@ -132,9 +132,10 @@ namespace ZeroCue.DataProbe.Services
                         }
                         throw new Exception("Mando Scuf no encontrado. Asegura el driver WinUSB.");
                     }
-                    if (DeviceProfile.IsExperimentalWired(dev.VendorId, dev.ProductId))
+                    var wiredIdentity = DeviceProfile.FindWiredDevice(dev.VendorId, dev.ProductId);
+                    if (wiredIdentity?.IsExperimental == true)
                     {
-                        LogInput($"[EXPERIMENTAL] Dispositivo cableado VID=0x{dev.VendorId:X4} PID=0x{dev.ProductId:X4} aceptado usando el protocolo de {DeviceProfile.Name}; la compatibilidad de este PID no esta validada.");
+                        LogInput($"[EXPERIMENTAL] Dispositivo cableado variant={wiredIdentity.Variant} VID=0x{dev.VendorId:X4} PID=0x{dev.ProductId:X4} aceptado usando el protocolo de {DeviceProfile.Name}; la compatibilidad de esta identidad no esta validada.");
                     }
                     IsConnecting = true;
                     SetConnectionStatus(

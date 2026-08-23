@@ -75,37 +75,28 @@ jobs:
           @"
           ZeroCue public alpha for Windows x64.
 
-          This build fixes WinUSB re-enumeration and driver recovery for the
-          experimental original SCUF PC Controller Dongle while preserving the
-          existing V2 support:
+          This build expands wired USB support across the known SCUF Envision
+          hardware families while preserving the existing receiver handling:
 
-          - Detects the experimental V1 dongle as composite base state
-            VID_2E95 / PID_434E and observed active state VID_2E95 / PID_5046.
-          - Installs WinUSB only on MI_04 and MI_03 in the 434E base state, while
-            treating 5046 as a whole-device active state equivalent to V2 3A09.
-          - Never replaces V1 434E MI_00 or its USB composite parent, keeping the
-            official Scufdriver6 binding outside ZeroCue's scope.
-          - Rescans and briefly waits for a supported receiver when Windows is
-            still enumerating it as the elevated installation begins.
-          - Restarts and rescans only the selected receiver bindings after driver
-            installation, covering both MI_03/MI_04 base states and whole-device
-            active states, then waits for every WinUSB binding to re-enumerate.
-          - Retries endpoint validation and closes MI_04 before opening MI_03 so
-            validation cannot block itself while Windows publishes new paths.
-          - Rejects composite-parent fallback paths for MI_03/MI_04 on composite
-            receivers, avoiding misleading WinUSB errors from the USB parent.
-          - Automatically rolls back the exact receiver identity if installation
-            is partial or its endpoint topology is incompatible.
-          - Restores only verified ZeroCue or strictly scoped Zadig/libwdi WinUSB
-            packages, restarts the unchanged composite parent, and waits until all
-            previously present interfaces return on their original drivers.
-          - Treats a sibling interface disappearing during PnP re-enumeration as a
-            recoverable transition while still failing if WinUSB remains active or
-            any original interface does not return.
-          - Adds receiver variant, experimental status, VID/PID, present and phantom
-            vendor PnP nodes, parent/problem properties, WDI output, rescan results,
-            binding readiness, endpoint topology, and a full rollback transcript to
-            the diagnostic logs.
+          - Adds experimental wired support for original SCUF Envision-family
+            devices using VID_2E95 / PID_434B and PID_434D.
+          - Keeps the existing wired VID_1B1C / PID_3A04 and PID_3A05 identities.
+          - Applies WinUSB only to the wired controller's MI_00, MI_03, and MI_04
+            bindings, matching the established ZeroCue wired transport.
+          - Detects the new V1 wired identities at runtime and attempts the current
+            64-byte Envision protocol with explicit experimental diagnostics.
+          - Scans and logs all present and phantom VID_1B1C and VID_2E95 USB nodes
+            during wired driver selection, exposing unknown revisions in the
+            communication log instead of reporting only a generic missing device.
+          - Keeps receiver identities VID_1B1C / PID_3A08 and PID_3A09 plus
+            VID_2E95 / PID_434E and PID_5046 strictly outside the wired installer.
+          - Preserves exact, manifest-scoped driver restoration and all existing
+            automatic rollback and receiver topology safeguards.
+
+          The VID_2E95 wired profiles are intentionally experimental. If the
+          controller still fails to connect, attach both ZeroCue logs so its
+          selected identity, interface bindings, and protocol response can be
+          reviewed.
 
           ViGEmBus 1.22.0 must be installed before ZeroCue's WinUSB driver. Driver
           installation is required for the connection mode you use: install the

@@ -3,6 +3,12 @@ using System.Linq;
 
 namespace ZeroCue.DataProbe.Services
 {
+    public sealed record WiredDeviceIdentity(
+        int VendorId,
+        int ProductId,
+        string Variant,
+        bool IsExperimental);
+
     public sealed record WirelessReceiverIdentity(
         int VendorId,
         int ProductId,
@@ -19,9 +25,6 @@ namespace ZeroCue.DataProbe.Services
     public sealed record SupportedScufDeviceProfile
     {
         public required string Name { get; init; }
-        public required int VendorId { get; init; }
-        public required int WiredPid { get; init; }
-        public required int[] ExperimentalWiredPids { get; init; }
         public required int WirelessBasePid { get; init; }
         public required int WirelessActivePid { get; init; }
         public required int HidUsagePage { get; init; }
@@ -33,12 +36,17 @@ namespace ZeroCue.DataProbe.Services
         public required byte RuntimeAckChannel { get; init; }
 
         public bool IsWired(int vendorId, int productId) =>
-            vendorId == VendorId && (productId == WiredPid || ExperimentalWiredPids.Contains(productId));
+            WiredDeviceIdentities.Any(identity =>
+                identity.VendorId == vendorId && identity.ProductId == productId);
 
         public bool IsExperimentalWired(int vendorId, int productId) =>
-            vendorId == VendorId && ExperimentalWiredPids.Contains(productId);
+            FindWiredDevice(vendorId, productId)?.IsExperimental == true;
 
-        public int[] WiredPids => new[] { WiredPid }.Concat(ExperimentalWiredPids).ToArray();
+        public WiredDeviceIdentity? FindWiredDevice(int vendorId, int productId) =>
+            WiredDeviceIdentities.FirstOrDefault(identity =>
+                identity.VendorId == vendorId && identity.ProductId == productId);
+
+        public WiredDeviceIdentity[] WiredDeviceIdentities { get; init; } = Array.Empty<WiredDeviceIdentity>();
 
         public bool IsWirelessReceiver(int vendorId, int productId) =>
             WirelessReceiverIdentities.Any(identity =>
@@ -58,9 +66,6 @@ namespace ZeroCue.DataProbe.Services
         public static SupportedScufDeviceProfile ScufEnvisionPro { get; } = new()
         {
             Name = "SCUF Envision Pro",
-            VendorId = 0x1B1C,
-            WiredPid = 0x3A05,
-            ExperimentalWiredPids = new[] { 0x3A04 },
             WirelessBasePid = 0x3A08,
             WirelessActivePid = 0x3A09,
             HidUsagePage = 0xFF42,
@@ -70,6 +75,13 @@ namespace ZeroCue.DataProbe.Services
             InitAckChannel = 0x00,
             RuntimeCommandChannel = 0x09,
             RuntimeAckChannel = 0x01,
+            WiredDeviceIdentities = new[]
+            {
+                new WiredDeviceIdentity(0x1B1C, 0x3A05, "Envision Pro wired controller V2", false),
+                new WiredDeviceIdentity(0x1B1C, 0x3A04, "Envision wired controller V2", true),
+                new WiredDeviceIdentity(0x2E95, 0x434D, "SCUF Envision Pro wired controller V1", true),
+                new WiredDeviceIdentity(0x2E95, 0x434B, "SCUF Envision wired controller V1", true)
+            },
             WirelessReceiverIdentities = new[]
             {
                 new WirelessReceiverIdentity(0x1B1C, 0x3A08, "Envision Pro Wireless USB Receiver V2 (base)", false, true, 0x02, 0x82, true),

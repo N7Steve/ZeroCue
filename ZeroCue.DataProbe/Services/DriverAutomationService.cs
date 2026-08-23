@@ -1397,6 +1397,22 @@ namespace ZeroCue.DataProbe.Services
                                     new DriverBinding("0x3A04", 4, "interface 4 (MI_04)"),
                                     new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")
                                 },
+                                Array.Empty<ObsoleteDriverBinding>()),
+                            new DriverHardwareVariant(
+                                "wired-v1",
+                                "SCUF Envision wired controller V1",
+                                "ZeroCue SCUF Envision Wired V1",
+                                "0x2E95",
+                                true,
+                                new[]
+                                {
+                                    new DriverBinding("0x434D", 0, "experimental V1 Pro interface 0 (MI_00)"),
+                                    new DriverBinding("0x434D", 4, "experimental V1 Pro interface 4 (MI_04)"),
+                                    new DriverBinding("0x434D", 3, "experimental V1 Pro interface 3 (MI_03)"),
+                                    new DriverBinding("0x434B", 0, "experimental V1 interface 0 (MI_00)"),
+                                    new DriverBinding("0x434B", 4, "experimental V1 interface 4 (MI_04)"),
+                                    new DriverBinding("0x434B", 3, "experimental V1 interface 3 (MI_03)")
+                                },
                                 Array.Empty<ObsoleteDriverBinding>())
                         })
                 };

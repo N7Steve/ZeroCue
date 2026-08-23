@@ -17,8 +17,10 @@ you manage mappings and device settings from a single interface.
 > [!CAUTION]
 > Hardware compatibility is currently guaranteed only for the SCUF Envision Pro
 > V2. Wired SCUF Envision V2 devices using `VID_1B1C / PID_3A04` are detected as
-> an experimental, unvalidated profile that reuses the Pro V2 protocol. The SCUF
-> PC Controller Dongle V1 using `VID_2E95 / PID_434E` is also experimental and
+> an experimental, unvalidated profile that reuses the Pro V2 protocol. Original
+> wired Envision-family devices using `VID_2E95 / PID_434B` or `PID_434D` are
+> also experimental and reuse that wired protocol. The SCUF PC Controller Dongle
+> V1 using `VID_2E95 / PID_434E` is experimental and
 > reuses the V2 wireless protocol only after its WinUSB endpoint topology has
 > been validated. ZeroCue is early alpha software: bugs, failed connections,
 > crashes, and unexpected behavior may occur, and reliable operation is not
@@ -91,6 +93,14 @@ unofficial mirror.
 ZeroCue records the driver packages it installs and its restore option only
 removes verified packages for the selected SCUF controller or receiver. Restoring
 the original driver allows iCUE to detect the device again.
+
+The wired installer recognizes the known Envision-family controller identities
+`1B1C:3A04`, `1B1C:3A05`, `2E95:434B`, and `2E95:434D`. The `2E95` wired
+identities are treated as experimental and use the same `MI_00`, `MI_03`, and
+`MI_04` WinUSB bindings as the established wired transport. Driver selection
+diagnostics enumerate every present and phantom `1B1C` or `2E95` USB node so an
+unknown hardware revision is visible in the communication log instead of being
+reported only as a generic missing controller.
 
 For the experimental V1 dongle, ZeroCue treats `2E95:434E` as its composite base
 state and modifies only interfaces `MI_03` and `MI_04`; it does not replace

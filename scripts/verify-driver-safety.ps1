@@ -9,6 +9,8 @@ $servicePath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\DriverAutomationS
 $source = Get-Content -LiteralPath $servicePath -Raw
 $profilePath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\SupportedScufDeviceProfile.cs"
 $profileSource = Get-Content -LiteralPath $profilePath -Raw
+$wiredServicePath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\ScufDeviceService.Usb.cs"
+$wiredServiceSource = Get-Content -LiteralPath $wiredServicePath -Raw
 $transportPath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\WirelessDongleWinUsbTransport.cs"
 $transportSource = Get-Content -LiteralPath $transportPath -Raw
 $probePath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\WirelessWinUsbAggressiveSessionProbe.cs"
@@ -132,6 +134,8 @@ $requiredPortableTargets = @(
     '"0x3A08"',
     '"0x3A09"',
     '"0x2E95"',
+    '"0x434B"',
+    '"0x434D"',
     '"0x434E"',
     '"0x5046"',
     'new DriverBinding("0x3A08", 4, "V2 interface 4 (MI_04)")',
@@ -147,6 +151,12 @@ $requiredPortableTargets = @(
     'new DriverBinding("0x3A04", 0, "interface 0 (MI_00)")',
     'new DriverBinding("0x3A04", 4, "interface 4 (MI_04)")',
     'new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")',
+    'new DriverBinding("0x434D", 0, "experimental V1 Pro interface 0 (MI_00)")',
+    'new DriverBinding("0x434D", 4, "experimental V1 Pro interface 4 (MI_04)")',
+    'new DriverBinding("0x434D", 3, "experimental V1 Pro interface 3 (MI_03)")',
+    'new DriverBinding("0x434B", 0, "experimental V1 interface 0 (MI_00)")',
+    'new DriverBinding("0x434B", 4, "experimental V1 interface 4 (MI_04)")',
+    'new DriverBinding("0x434B", 3, "experimental V1 interface 3 (MI_03)")',
     'manifestHardwareIds.IsSubsetOf(expectedHardwareIds)',
     '$candidateDevices.Count -gt 0',
     '$selectionAttempt -le 6',
@@ -219,11 +229,26 @@ if ($source -match 'new DriverBinding\(\"0x5046\",\s*[0-9]') {
     throw "PID 5046 is modeled as the V1 whole-device active state and must not be installed as a composite MI interface."
 }
 
+foreach ($wiredV1Pid in @("434B", "434D")) {
+    $bindingPatternPrefix = 'new DriverBinding\("0x{0}",\s*' -f $wiredV1Pid
+    if ($source -notmatch ($bindingPatternPrefix + '0') -or
+        $source -notmatch ($bindingPatternPrefix + '3') -or
+        $source -notmatch ($bindingPatternPrefix + '4')) {
+        throw "Experimental wired V1 PID $wiredV1Pid must remain scoped to MI_00, MI_03, and MI_04."
+    }
+}
+
 if ($source -match 'Read-Host') {
     throw "The elevated driver workflow must not block indefinitely waiting for console input."
 }
 
 $requiredV1RuntimeFragments = @(
+    'new WiredDeviceIdentity(0x1B1C, 0x3A05, "Envision Pro wired controller V2", false)',
+    'new WiredDeviceIdentity(0x1B1C, 0x3A04, "Envision wired controller V2", true)',
+    'new WiredDeviceIdentity(0x2E95, 0x434D, "SCUF Envision Pro wired controller V1", true)',
+    'new WiredDeviceIdentity(0x2E95, 0x434B, "SCUF Envision wired controller V1", true)',
+    'WiredDeviceIdentities.Any',
+    'FindWiredDevice(dev.VendorId, dev.ProductId)',
     'new WirelessReceiverIdentity(0x1B1C, 0x3A08, "Envision Pro Wireless USB Receiver V2 (base)", false, true, 0x02, 0x82, true)',
     'new WirelessReceiverIdentity(0x1B1C, 0x3A09, "Envision Pro Wireless USB Receiver V2 (active)", false, false, 0x01, 0x81, false)',
     'new WirelessReceiverIdentity(0x2E95, 0x434E, "SCUF PC Controller Dongle V1 (base)", true, true, 0x02, 0x82, true)',
@@ -245,7 +270,7 @@ $requiredV1RuntimeFragments = @(
     'WirelessWinUsbInterfaceTarget.RuntimeMi04 =>'
 )
 
-$runtimeSources = $source + $profileSource + $transportSource + $probeSource
+$runtimeSources = $source + $profileSource + $wiredServiceSource + $transportSource + $probeSource
 foreach ($fragment in $requiredV1RuntimeFragments) {
     if ($runtimeSources.IndexOf($fragment, [System.StringComparison]::Ordinal) -lt 0) {
         throw "Required V1 runtime receiver boundary is missing: $fragment"

@@ -51,43 +51,138 @@ namespace ZeroCue.DataProbe.Services
 
         private void SendRumble(byte largeMotor, byte smallMotor)
         {
-            if (_rumbleWriter != null)
+            _ = QueueRumble(largeMotor, smallMotor);
+        }
+
+        private Task QueueRumble(byte largeMotor, byte smallMotor)
+        {
+            // The physical controller latches its last motor state. Coalesce bursts while
+            // USB is busy, but always deliver the newest state (especially the 0/0 stop).
+            lock (_rumbleDispatchLock)
             {
-                lock (_rumbleBuffer)
+                _pendingLargeMotor = largeMotor;
+                _pendingSmallMotor = smallMotor;
+                _rumbleRequestVersion++;
+
+                if (!_rumbleDispatchRunning)
                 {
-                    try
-                    {
-                        if (UsbLock.Wait(10))
-                        {
-                            try
-                            {
-                                _rumbleBuffer[8] = largeMotor;
-                                _rumbleBuffer[9] = smallMotor;
-                                _rumbleWriter.Write(_rumbleBuffer, 100, out int bytesWritten);
-                            }
-                            finally { UsbLock.Release(); }
-                        }
-                    }
-                    catch { }
+                    _rumbleDispatchRunning = true;
+                    _rumbleDispatchTask = Task.Run(DispatchRumbleLoopAsync);
                 }
+
+                return _rumbleDispatchTask;
             }
-            else if (ConnectionKind == ScufConnectionKind.Wireless && _wirelessWinUsbAuxRadioTransport != null)
+        }
+
+        private async Task DispatchRumbleLoopAsync()
+        {
+            while (true)
             {
+                long dispatchedVersion;
+
                 try
                 {
-                    byte[] wirelessRumbleBuffer = new byte[64];
-                    lock (_rumbleBuffer)
+                    if (_rumbleWriter != null)
                     {
-                        _rumbleBuffer[8] = largeMotor;
-                        _rumbleBuffer[9] = smallMotor;
-                        Array.Copy(_rumbleBuffer, wirelessRumbleBuffer, _rumbleBuffer.Length);
+                        await UsbLock.WaitAsync().ConfigureAwait(false);
+                        try
+                        {
+                            UsbEndpointWriter? writer = _rumbleWriter;
+                            if (writer != null)
+                            {
+                                lock (_rumbleDispatchLock)
+                                {
+                                    _rumbleBuffer[8] = _pendingLargeMotor;
+                                    _rumbleBuffer[9] = _pendingSmallMotor;
+                                    dispatchedVersion = _rumbleRequestVersion;
+                                }
+
+                                var error = writer.Write(_rumbleBuffer, 100, out int bytesWritten);
+                                if (error != Error.Success || bytesWritten != _rumbleBuffer.Length)
+                                {
+                                    LogInput($"[RUMBLE] WARN wired write result={error} bytes={bytesWritten}/{_rumbleBuffer.Length}.");
+                                }
+                            }
+                            else
+                            {
+                                lock (_rumbleDispatchLock)
+                                {
+                                    dispatchedVersion = _rumbleRequestVersion;
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            UsbLock.Release();
+                        }
                     }
-                    _ = _wirelessWinUsbAuxRadioTransport.WriteReportAsync(wirelessRumbleBuffer, CancellationToken.None);
+                    else if (ConnectionKind == ScufConnectionKind.Wireless &&
+                             _wirelessWinUsbAuxRadioTransport != null)
+                    {
+                        byte[] wirelessRumbleBuffer = new byte[64];
+                        lock (_rumbleDispatchLock)
+                        {
+                            _rumbleBuffer[8] = _pendingLargeMotor;
+                            _rumbleBuffer[9] = _pendingSmallMotor;
+                            Array.Copy(_rumbleBuffer, wirelessRumbleBuffer, _rumbleBuffer.Length);
+                            dispatchedVersion = _rumbleRequestVersion;
+                        }
+
+                        await _wirelessWinUsbAuxRadioTransport
+                            .WriteReportAsync(wirelessRumbleBuffer, CancellationToken.None)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        lock (_rumbleDispatchLock)
+                        {
+                            dispatchedVersion = _rumbleRequestVersion;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
-                    LogInput($"[RUMBLE] Error enviando rumble inalambrico: {ex.Message}");
+                    LogInput($"[RUMBLE] Error sending rumble: {ex.Message}");
+                    lock (_rumbleDispatchLock)
+                    {
+                        dispatchedVersion = _rumbleRequestVersion;
+                    }
                 }
+
+                lock (_rumbleDispatchLock)
+                {
+                    if (dispatchedVersion == _rumbleRequestVersion)
+                    {
+                        _rumbleDispatchRunning = false;
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void StopRumbleBeforeDisconnect()
+        {
+            if (_rumbleWriter == null &&
+                (ConnectionKind != ScufConnectionKind.Wireless || _wirelessWinUsbAuxRadioTransport == null))
+            {
+                return;
+            }
+
+            try
+            {
+                Task stopTask = QueueRumble(0, 0);
+                if (!stopTask.Wait(2000))
+                {
+                    LogInput("[RUMBLE] WARN stop command did not finish before disconnect timeout.");
+                }
+                else
+                {
+                    LogInput("[RUMBLE] Motors stopped before disconnect.");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogInput($"[RUMBLE] WARN stop command failed during disconnect: {ex.GetBaseException().Message}");
             }
         }
 

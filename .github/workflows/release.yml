@@ -75,28 +75,20 @@ jobs:
           @"
           ZeroCue public alpha for Windows x64.
 
-          This build expands wired USB support across the known SCUF Envision
-          hardware families while preserving the existing receiver handling:
+          This build fixes rumble getting stuck on wired SCUF Envision controllers:
 
-          - Adds experimental wired support for original SCUF Envision-family
-            devices using VID_2E95 / PID_434B and PID_434D.
-          - Keeps the existing wired VID_1B1C / PID_3A04 and PID_3A05 identities.
-          - Applies WinUSB only to the wired controller's MI_00, MI_03, and MI_04
-            bindings, matching the established ZeroCue wired transport.
-          - Detects the new V1 wired identities at runtime and attempts the current
-            64-byte Envision protocol with explicit experimental diagnostics.
-          - Scans and logs all present and phantom VID_1B1C and VID_2E95 USB nodes
-            during wired driver selection, exposing unknown revisions in the
-            communication log instead of reporting only a generic missing device.
-          - Keeps receiver identities VID_1B1C / PID_3A08 and PID_3A09 plus
-            VID_2E95 / PID_434E and PID_5046 strictly outside the wired installer.
-          - Preserves exact, manifest-scoped driver restoration and all existing
-            automatic rollback and receiver topology safeguards.
+          - Queues and coalesces ViGEm motor feedback while the shared USB channel
+            is busy instead of silently dropping commands after 10 milliseconds.
+          - Guarantees delivery of the newest motor state, especially the 0/0 stop
+            command that releases a controller's latched vibration state.
+          - Sends an explicit motor stop and waits for it before releasing the USB
+            writer during controller or application shutdown.
+          - Reports partial or failed wired rumble writes and shutdown stop timeouts
+            in the ZeroCue log for future diagnostics.
 
-          The VID_2E95 wired profiles are intentionally experimental. If the
-          controller still fails to connect, attach both ZeroCue logs so its
-          selected identity, interface bindings, and protocol response can be
-          reviewed.
+          This addresses vibration that could start during gameplay, continue after
+          the game exited, and stop only after vibration was disabled in-game or in
+          ZeroCue.
 
           ViGEmBus 1.22.0 must be installed before ZeroCue's WinUSB driver. Driver
           installation is required for the connection mode you use: install the

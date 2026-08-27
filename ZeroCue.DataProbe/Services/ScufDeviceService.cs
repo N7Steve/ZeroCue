@@ -70,6 +70,12 @@ namespace ZeroCue.DataProbe.Services
         private UsbEndpointWriter? _rumbleWriter;
         private UsbEndpointWriter? _writer2;
         private readonly byte[] _rumbleBuffer = new byte[13] { 0x09, 0x00, 0x6A, 0x09, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0xEB };
+        private readonly object _rumbleDispatchLock = new object();
+        private byte _pendingLargeMotor;
+        private byte _pendingSmallMotor;
+        private long _rumbleRequestVersion;
+        private bool _rumbleDispatchRunning;
+        private Task _rumbleDispatchTask = Task.CompletedTask;
         private CancellationTokenSource? _cts;
         private Task? _pollingTask;
         private int _disconnecting;

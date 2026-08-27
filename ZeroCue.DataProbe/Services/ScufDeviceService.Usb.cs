@@ -327,6 +327,7 @@ namespace ZeroCue.DataProbe.Services
             {
                 _xbox.FeedbackReceived -= Xbox_FeedbackReceived;
             }
+            StopRumbleBeforeDisconnect();
             if (_rumbleWriter != null)
             {
                 try { GC.SuppressFinalize(_rumbleWriter); } catch { }

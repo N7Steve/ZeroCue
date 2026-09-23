@@ -118,15 +118,20 @@ PnP, waits for every exact matching instance to report the WinUSB service, and
 then runs an idempotent convergence pass to repair any interface displaced while
 the composite device re-enumerated.
 
-Receiver bindings are restarted and rescanned without removing a successfully
-installed device node. A restart or endpoint-probe warning does not undo valid
-WinUSB bindings; the final state of every required PnP binding is authoritative.
-Partial packages are retained in the ownership manifest so a later retry can
-converge and the explicit restore action can still recover them. Recovery waits
-for every previously present interface to return on its original driver before
-reporting success. Installation diagnostics include present and phantom vendor
-PnP nodes, parent and problem-code properties, per-attempt debug output, binding
-readiness, and bounded rescan output.
+Receiver installation prepares every transport state of the selected hardware
+variant in one operation. For V2 this means the base `3A08` packages for `MI_04`
+and `MI_03` plus the whole-device active `3A09` package. The base and active PID
+states are mutually exclusive, so an absent binding is accepted only when its
+exact WinUSB package is present in the Driver Store; every binding that is
+currently present must actually report the WinUSB service. This prevents a
+normal `3A08` to `3A09` transition from being misreported as an `MI_04` failure.
+An endpoint-probe warning does not undo valid WinUSB bindings. Partial packages
+are retained in the ownership manifest so a later retry can converge and the
+explicit restore action can still recover them. Recovery waits for every
+previously present interface to return on its original driver before reporting
+success. Installation diagnostics include present and phantom vendor PnP nodes,
+parent and problem-code properties, per-attempt debug output, package readiness,
+and bounded rescan output.
 
 ZeroCue is not required for recovery. You can use Windows Device Manager as an
 administrator, locate only the SCUF controller or receiver interfaces modified by

@@ -182,18 +182,33 @@ namespace ZeroCue.DataProbe.Services
                     }
                 }
 
+                ps1.AppendLine("function Get-StagedWinUsbInf {");
+                ps1.AppendLine("    param([string]$hardwareId)");
+                ps1.AppendLine("    foreach ($infName in @(Get-PublishedInfNames)) {");
+                ps1.AppendLine("        $infPath = Join-Path (Join-Path $env:windir 'INF') $infName");
+                ps1.AppendLine("        $content = Get-Content -LiteralPath $infPath -Raw -ErrorAction SilentlyContinue");
+                ps1.AppendLine("        if ($content -match [regex]::Escape($hardwareId) -and $content -match 'AddService\\s*=\\s*WinUSB') { return $infName }");
+                ps1.AppendLine("    }");
+                ps1.AppendLine("    return $null");
+                ps1.AppendLine("}");
                 ps1.AppendLine("function Install-WdiDriver {");
-                ps1.AppendLine("    param([string]$tempDir, [int]$interfaceId, [string]$miString)");
+                ps1.AppendLine("    param([string]$tempDir, [string]$bindingVidValue, [string]$bindingVid, [string]$bindingPidValue, [string]$bindingPid, [int]$interfaceId, [string]$miString, [bool]$allowAbsent)");
                 ps1.AppendLine("    $miHex = if ($interfaceId -ge 0) { '{0:X2}' -f $interfaceId } else { $null }");
+                ps1.AppendLine("    $bindingHardwareId = if ($interfaceId -ge 0) { \"VID_$bindingVidValue&PID_$bindingPidValue&MI_$miHex\" } else { \"VID_$bindingVidValue&PID_$bindingPidValue\" }");
                 ps1.AppendLine("    $targetInstancePattern = if ($interfaceId -ge 0) {");
-                ps1.AppendLine("        \"USB\\VID_$selectedVidValue&PID_$selectedPidValue&MI_$miHex\\*\"");
+                ps1.AppendLine("        \"USB\\VID_$bindingVidValue&PID_$bindingPidValue&MI_$miHex\\*\"");
                 ps1.AppendLine("    } else {");
-                ps1.AppendLine("        \"USB\\VID_$selectedVidValue&PID_$selectedPidValue\\*\"");
+                ps1.AppendLine("        \"USB\\VID_$bindingVidValue&PID_$bindingPidValue\\*\"");
                 ps1.AppendLine("    }");
                 ps1.AppendLine("    $existingDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $targetInstancePattern })");
                 ps1.AppendLine("    $alreadyReady = $existingDevices.Count -gt 0 -and @($existingDevices | Where-Object { $_.Service -notmatch '^WinUSB$' }).Count -eq 0");
                 ps1.AppendLine("    if ($alreadyReady) {");
                 ps1.AppendLine($"        Write-Output \"Binding already ready; preserving completed WinUSB install binding=$miString instances=$($existingDevices.InstanceId -join '|').\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine("        return 0");
+                ps1.AppendLine("    }");
+                ps1.AppendLine("    $stagedInf = Get-StagedWinUsbInf -hardwareId $bindingHardwareId");
+                ps1.AppendLine("    if ($allowAbsent -and $existingDevices.Count -eq 0 -and $stagedInf) {");
+                ps1.AppendLine($"        Write-Output \"Binding state is absent but its exact WinUSB package is staged binding=$miString hardwareId=$bindingHardwareId inf=$stagedInf.\" >> {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine("        return 0");
                 ps1.AppendLine("    }");
                 ps1.AppendLine("    Write-Host \"-> Installing $($miString)...\" -ForegroundColor Cyan");
@@ -206,7 +221,7 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("        $proc = $null");
                 ps1.AppendLine("        $procExitText = '<not started>'");
                 ps1.AppendLine("        try {");
-                ps1.AppendLine("            $argsArray = @('-n', $selectedDeviceName, '-v', $selectedVid, '-p', $selectedPid)");
+                ps1.AppendLine("            $argsArray = @('-n', $selectedDeviceName, '-v', $bindingVid, '-p', $bindingPid)");
                 ps1.AppendLine("            if ($interfaceId -ge 0) { $argsArray += @('-i', [string]$interfaceId) }");
                 ps1.AppendLine("            $argsArray += @('-t', '0', '-s', '-o', '30000', '-l', '0', '-d', $attemptDir)");
                 ps1.AppendLine($"            Write-Output \"wdi-simple start binding=$miString attempt=$driverAttempt/3 args=$($argsArray -join ' ') tempDir=$attemptDir\" >> {PowerShellLiteral(wdiLog)}");
@@ -242,6 +257,12 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("            Write-Host \"   [OK] $miString installed successfully.\" -ForegroundColor Green");
                 ps1.AppendLine("            return 0");
                 ps1.AppendLine("        }");
+                ps1.AppendLine("        $stagedInf = Get-StagedWinUsbInf -hardwareId $bindingHardwareId");
+                ps1.AppendLine("        if ($allowAbsent -and $finalDevs.Count -eq 0 -and $stagedInf) {");
+                ps1.AppendLine($"            Write-Output \"Binding transitioned to another receiver state after package staging binding=$miString hardwareId=$bindingHardwareId inf=$stagedInf.\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine("            Write-Host \"   [OK] $miString package staged for its receiver state.\" -ForegroundColor Green");
+                ps1.AppendLine("            return 0");
+                ps1.AppendLine("        }");
                 ps1.AppendLine($"        Write-Output \"WinUSB not ready after attempt=$driverAttempt/3 binding=$miString exitCode=$procExitText; restarting exact matching nodes before retry.\" >> {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine("        foreach ($retryDevice in $finalDevs) {");
                 ps1.AppendLine("            $restartOutput = & pnputil.exe /restart-device $retryDevice.InstanceId 2>&1");
@@ -260,8 +281,12 @@ namespace ZeroCue.DataProbe.Services
                     {
                         int interfaceId = binding.InterfaceId ?? -1;
                         string bindingSuffix = binding.InterfaceId is int id ? $"mi{id}" : "device";
-                        ps1.AppendLine($"if ($selectedVidValue -eq {PowerShellLiteral(variant.VidValue)} -and $selectedPidValue -eq {PowerShellLiteral(binding.PidValue)}) {{");
-                        ps1.AppendLine($"    $resultCodes += Install-WdiDriver -tempDir {PowerShellLiteral($"{tempDirPrefix}_{variant.Key}_{bindingSuffix}")} -interfaceId {interfaceId} -miString {PowerShellLiteral(binding.Name)}");
+                        string bindingCondition = target == DriverTarget.Receiver
+                            ? $"$selectedVidValue -eq {PowerShellLiteral(variant.VidValue)} -and $selectedVariant -eq {PowerShellLiteral(variant.Name)}"
+                            : $"$selectedVidValue -eq {PowerShellLiteral(variant.VidValue)} -and $selectedPidValue -eq {PowerShellLiteral(binding.PidValue)}";
+                        string allowAbsent = target == DriverTarget.Receiver ? "$true" : "$false";
+                        ps1.AppendLine($"if ({bindingCondition}) {{");
+                        ps1.AppendLine($"    $resultCodes += Install-WdiDriver -tempDir {PowerShellLiteral($"{tempDirPrefix}_{variant.Key}_{bindingSuffix}")} -bindingVidValue {PowerShellLiteral(variant.VidValue)} -bindingVid {PowerShellLiteral(variant.Vid)} -bindingPidValue {PowerShellLiteral(binding.PidValue)} -bindingPid {PowerShellLiteral(binding.Pid)} -interfaceId {interfaceId} -miString {PowerShellLiteral(binding.Name)} -allowAbsent {allowAbsent}");
                         ps1.AppendLine("    Start-Sleep -Seconds 2");
                         ps1.AppendLine("}");
                     }
@@ -278,8 +303,12 @@ namespace ZeroCue.DataProbe.Services
                     {
                         int interfaceId = binding.InterfaceId ?? -1;
                         string bindingSuffix = binding.InterfaceId is int id ? $"mi{id}" : "device";
-                        ps1.AppendLine($"if ($selectedVidValue -eq {PowerShellLiteral(variant.VidValue)} -and $selectedPidValue -eq {PowerShellLiteral(binding.PidValue)}) {{");
-                        ps1.AppendLine($"    $resultCodes += Install-WdiDriver -tempDir {PowerShellLiteral($"{tempDirPrefix}_{variant.Key}_{bindingSuffix}")} -interfaceId {interfaceId} -miString {PowerShellLiteral(binding.Name)}");
+                        string bindingCondition = target == DriverTarget.Receiver
+                            ? $"$selectedVidValue -eq {PowerShellLiteral(variant.VidValue)} -and $selectedVariant -eq {PowerShellLiteral(variant.Name)}"
+                            : $"$selectedVidValue -eq {PowerShellLiteral(variant.VidValue)} -and $selectedPidValue -eq {PowerShellLiteral(binding.PidValue)}";
+                        string allowAbsent = target == DriverTarget.Receiver ? "$true" : "$false";
+                        ps1.AppendLine($"if ({bindingCondition}) {{");
+                        ps1.AppendLine($"    $resultCodes += Install-WdiDriver -tempDir {PowerShellLiteral($"{tempDirPrefix}_{variant.Key}_{bindingSuffix}")} -bindingVidValue {PowerShellLiteral(variant.VidValue)} -bindingVid {PowerShellLiteral(variant.Vid)} -bindingPidValue {PowerShellLiteral(binding.PidValue)} -bindingPid {PowerShellLiteral(binding.Pid)} -interfaceId {interfaceId} -miString {PowerShellLiteral(binding.Name)} -allowAbsent {allowAbsent}");
                         ps1.AppendLine("    Start-Sleep -Seconds 2");
                         ps1.AppendLine("}");
                     }
@@ -292,11 +321,23 @@ namespace ZeroCue.DataProbe.Services
                         string instancePattern = binding.InterfaceId is int interfaceId
                             ? $"USB\\VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{interfaceId:X2}\\*"
                             : $"USB\\VID_{variant.VidValue}&PID_{binding.PidValue}\\*";
-                        ps1.AppendLine($"    [pscustomobject]@{{ VidValue={PowerShellLiteral(variant.VidValue)}; PidValue={PowerShellLiteral(binding.PidValue)}; InstancePattern={PowerShellLiteral(instancePattern)}; Name={PowerShellLiteral(binding.Name)} }}");
+                        string hardwareId = binding.InterfaceId is int id
+                            ? $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{id:X2}"
+                            : $"VID_{variant.VidValue}&PID_{binding.PidValue}";
+                        ps1.AppendLine($"    [pscustomobject]@{{ Variant={PowerShellLiteral(variant.Name)}; VidValue={PowerShellLiteral(variant.VidValue)}; PidValue={PowerShellLiteral(binding.PidValue)}; HardwareId={PowerShellLiteral(hardwareId)}; InstancePattern={PowerShellLiteral(instancePattern)}; Name={PowerShellLiteral(binding.Name)} }}");
                     }
                 }
                 ps1.AppendLine(")");
-                ps1.AppendLine("$selectedRequiredBindings = @($requiredBindings | Where-Object { $_.VidValue -eq $selectedVidValue -and $_.PidValue -eq $selectedPidValue })");
+                if (target == DriverTarget.Receiver)
+                {
+                    ps1.AppendLine("$selectedRequiredBindings = @($requiredBindings | Where-Object { $_.VidValue -eq $selectedVidValue -and $_.Variant -eq $selectedVariant })");
+                    ps1.AppendLine("$allowAbsentRequiredBindings = $true");
+                }
+                else
+                {
+                    ps1.AppendLine("$selectedRequiredBindings = @($requiredBindings | Where-Object { $_.VidValue -eq $selectedVidValue -and $_.PidValue -eq $selectedPidValue })");
+                    ps1.AppendLine("$allowAbsentRequiredBindings = $false");
+                }
                 ps1.AppendLine("$missingFinalBindings = @()");
                 ps1.AppendLine("$finalBindingDevices = @()");
                 ps1.AppendLine("for ($finalAttempt = 1; $finalAttempt -le 15; $finalAttempt++) {");
@@ -304,12 +345,14 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("    $finalBindingStates = @($selectedRequiredBindings | ForEach-Object {");
                 ps1.AppendLine("        $binding = $_");
                 ps1.AppendLine("        $matchingDevices = @($allPresentDevices | Where-Object { $_.InstanceId -like $binding.InstancePattern })");
-                ps1.AppendLine("        $ready = $matchingDevices.Count -gt 0 -and @($matchingDevices | Where-Object { $_.Service -notmatch '^WinUSB$' }).Count -eq 0");
-                ps1.AppendLine("        [pscustomobject]@{ Name=$binding.Name; Ready=$ready; Devices=$matchingDevices }");
+                ps1.AppendLine("        $stagedInf = Get-StagedWinUsbInf -hardwareId $binding.HardwareId");
+                ps1.AppendLine("        $presentReady = ($allowAbsentRequiredBindings -and $matchingDevices.Count -eq 0) -or ($matchingDevices.Count -gt 0 -and @($matchingDevices | Where-Object { $_.Service -notmatch '^WinUSB$' }).Count -eq 0)");
+                ps1.AppendLine("        $ready = [bool]$stagedInf -and $presentReady");
+                ps1.AppendLine("        [pscustomobject]@{ Name=$binding.Name; Ready=$ready; StagedInf=$stagedInf; Devices=$matchingDevices }");
                 ps1.AppendLine("    })");
                 ps1.AppendLine("    $missingFinalBindings = @($finalBindingStates | Where-Object { -not $_.Ready } | Select-Object -ExpandProperty Name)");
                 ps1.AppendLine("    $finalBindingDevices = @($finalBindingStates | ForEach-Object { $_.Devices })");
-                ps1.AppendLine($"    Write-Output \"Final WinUSB readiness attempt=$finalAttempt ready=$($selectedRequiredBindings.Count - $missingFinalBindings.Count)/$($selectedRequiredBindings.Count) missing=$($missingFinalBindings -join '|')\" >> {PowerShellLiteral(wdiLog)}");
+                ps1.AppendLine($"    Write-Output \"Final WinUSB readiness attempt=$finalAttempt ready=$($selectedRequiredBindings.Count - $missingFinalBindings.Count)/$($selectedRequiredBindings.Count) missing=$($missingFinalBindings -join '|') packages=$((@($finalBindingStates | ForEach-Object {{ $_.Name + ':' + $_.StagedInf }})) -join '|')\" >> {PowerShellLiteral(wdiLog)}");
                 ps1.AppendLine("    if ($missingFinalBindings.Count -eq 0) { break }");
                 ps1.AppendLine("    if ($finalAttempt -eq 5 -or $finalAttempt -eq 10) { $null = & pnputil.exe /scan-devices 2>&1 }");
                 ps1.AppendLine("    Start-Sleep -Seconds 1");
@@ -318,18 +361,14 @@ namespace ZeroCue.DataProbe.Services
                 ps1.AppendLine("if ($missingFinalBindings.Count -gt 0) { $resultCodes += -1 }");
                 ps1.AppendLine("if ($migrationFailures -gt 0) { $resultCodes += -1 }");
 
-                if (target == DriverTarget.Receiver)
-                {
-                    AppendReceiverBindingReenumerationScript(ps1, config, wdiLog);
-                }
-
                 ps1.AppendLine("$publishedInfsAfter = @(Get-PublishedInfNames)");
                 ps1.AppendLine("$createdInfs = @($publishedInfsAfter | Where-Object { $publishedInfsBefore -notcontains $_ })");
                 ps1.AppendLine("$ownedInfs = @()");
                 ps1.AppendLine("foreach ($infName in $createdInfs) {");
                 ps1.AppendLine("    $infPath = Join-Path (Join-Path $env:windir 'INF') $infName");
                 ps1.AppendLine("    $content = Get-Content -LiteralPath $infPath -Raw -ErrorAction SilentlyContinue");
-                ps1.AppendLine("    if ($content -match 'ZeroCue' -and $content -match \"VID_$selectedVidValue&PID_$selectedPidValue\") { $ownedInfs += $infName }");
+                ps1.AppendLine("    $ownsSelectedBinding = @($selectedRequiredBindings | Where-Object { $content -match [regex]::Escape($_.HardwareId) }).Count -gt 0");
+                ps1.AppendLine("    if ($content -match 'ZeroCue' -and $ownsSelectedBinding) { $ownedInfs += $infName }");
                 ps1.AppendLine("}");
                 ps1.AppendLine("$selectedPattern = \"USB\\VID_$selectedVidValue&PID_$selectedPidValue*\"");
                 ps1.AppendLine("$afterDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.InstanceId -like $selectedPattern })");
@@ -408,8 +447,12 @@ namespace ZeroCue.DataProbe.Services
                     string selectedVariantName = result.TryGetValue("variant", out var variantValue) ? variantValue : string.Empty;
                     var selectedVariant = config.FindVariant(selectedVid, selectedPid);
                     Log($"{config.LogName} install results: variant={selectedVariantName} VID=0x{selectedVid} PID=0x{selectedPid} results={string.Join(",", resultCodes)} ownedPackages={string.Join(",", newlyOwnedPackages)}");
-                    int expectedResultCount = selectedVariant?.Bindings.Count(binding =>
-                        string.Equals(binding.PidValue, selectedPid, StringComparison.OrdinalIgnoreCase)) ?? 0;
+                    int expectedResultCount = selectedVariant == null
+                        ? 0
+                        : target == DriverTarget.Receiver
+                            ? selectedVariant.Bindings.Length
+                            : selectedVariant.Bindings.Count(binding =>
+                                string.Equals(binding.PidValue, selectedPid, StringComparison.OrdinalIgnoreCase));
                     bool success = expectedResultCount > 0 &&
                         resultCodes.Length == expectedResultCount &&
                         resultCodes.All(code => code == "0");
@@ -518,94 +561,6 @@ namespace ZeroCue.DataProbe.Services
             ps1.AppendLine("}");
         }
 
-        private static void AppendReceiverBindingReenumerationScript(
-            StringBuilder ps1,
-            DriverTargetConfig config,
-            string wdiLog)
-        {
-            var receiverBindings = config.Variants
-                .SelectMany(variant => variant.Bindings.Select(binding => new
-                {
-                    HardwareId = binding.InterfaceId is int interfaceId
-                        ? $"VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{interfaceId:X2}"
-                        : $"VID_{variant.VidValue}&PID_{binding.PidValue}",
-                    InstancePattern = binding.InterfaceId is int id
-                        ? $"USB\\VID_{variant.VidValue}&PID_{binding.PidValue}&MI_{id:X2}\\*"
-                        : $"USB\\VID_{variant.VidValue}&PID_{binding.PidValue}\\*",
-                    InterfaceId = binding.InterfaceId ?? -1,
-                    binding.Name
-                }))
-                .GroupBy(binding => binding.HardwareId, StringComparer.OrdinalIgnoreCase)
-                .Select(group => group.First())
-                .ToArray();
-            ps1.AppendLine("$receiverBindings = @(");
-            foreach (var binding in receiverBindings)
-            {
-                ps1.AppendLine($"    [pscustomobject]@{{ HardwareId={PowerShellLiteral(binding.HardwareId)}; InstancePattern={PowerShellLiteral(binding.InstancePattern)}; InterfaceId={binding.InterfaceId}; Name={PowerShellLiteral(binding.Name)} }}");
-            }
-            ps1.AppendLine(")");
-
-            ps1.AppendLine("$selectedReceiverBindings = @($receiverBindings | Where-Object { $_.HardwareId -like \"VID_$selectedVidValue&PID_$selectedPidValue*\" })");
-            ps1.AppendLine("if ($selectedReceiverBindings.Count -gt 0 -and $resultCodes.Count -gt 0 -and $resultCodes -notcontains -1) {");
-            ps1.AppendLine($"    Write-Output \"Starting exact receiver binding re-enumeration bindings=$($selectedReceiverBindings.Name -join '|').\" >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("    $presentReceiverDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue)");
-            ps1.AppendLine("    $selectedBindingDevices = @($presentReceiverDevices | Where-Object {");
-            ps1.AppendLine("        $instanceId = $_.InstanceId");
-            ps1.AppendLine("        @($selectedReceiverBindings | Where-Object { $instanceId -like $_.InstancePattern }).Count -gt 0");
-            ps1.AppendLine("    })");
-            ps1.AppendLine("    Write-PnpSnapshot -label 'receiver-before-restart' -devices $selectedBindingDevices");
-            ps1.AppendLine("    $strongReenumerationFailures = 0");
-            ps1.AppendLine("    foreach ($selectedBinding in $selectedReceiverBindings | Sort-Object InterfaceId) {");
-            ps1.AppendLine("        $matchingBindingDevices = @($presentReceiverDevices | Where-Object { $_.InstanceId -like $selectedBinding.InstancePattern })");
-            ps1.AppendLine("        foreach ($bindingDevice in $matchingBindingDevices | Sort-Object InstanceId) {");
-            ps1.AppendLine("            $restartOutput = & pnputil.exe /restart-device $bindingDevice.InstanceId 2>&1");
-            ps1.AppendLine("            $restartExitCode = $LASTEXITCODE");
-            ps1.AppendLine($"            $restartOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
-            ps1.AppendLine($"            Write-Output \"PnP restart exact receiver binding=$($bindingDevice.InstanceId) exitCode=$restartExitCode output=$($restartOutput -join ' | ')\" >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("            if ($restartExitCode -ne 0) { $strongReenumerationFailures++ }");
-            ps1.AppendLine("        }");
-            ps1.AppendLine("    }");
-            ps1.AppendLine("    $scanOutput = & pnputil.exe /scan-devices 2>&1");
-            ps1.AppendLine("    $scanExitCode = $LASTEXITCODE");
-            ps1.AppendLine($"    $scanOutput | Out-File -FilePath {PowerShellLiteral(wdiLog)} -Append -Encoding utf8");
-            ps1.AppendLine($"    Write-Output \"PnP scan after install exitCode=$scanExitCode\" >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("    $readyBindingCount = 0");
-            ps1.AppendLine("    $readyInstances = @()");
-            ps1.AppendLine("    $missingBindings = @($selectedReceiverBindings.Name)");
-            ps1.AppendLine("    for ($attempt = 1; $attempt -le 10; $attempt++) {");
-            ps1.AppendLine("        Start-Sleep -Seconds 1");
-            ps1.AppendLine("        $presentPnpDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue)");
-            ps1.AppendLine("        $bindingStates = @($selectedReceiverBindings | ForEach-Object {");
-            ps1.AppendLine("            $binding = $_");
-            ps1.AppendLine("            $matchingDevices = @($presentPnpDevices | Where-Object { $_.InstanceId -like $binding.InstancePattern -and $_.Service -match 'WINUSB' })");
-            ps1.AppendLine("            [pscustomobject]@{ Name=$binding.Name; Ready=($matchingDevices.Count -gt 0); Instances=@($matchingDevices.InstanceId) }");
-            ps1.AppendLine("        })");
-            ps1.AppendLine("        $readyBindingCount = @($bindingStates | Where-Object Ready).Count");
-            ps1.AppendLine("        $readyInstances = @($bindingStates | Where-Object Ready | ForEach-Object { $_.Instances })");
-            ps1.AppendLine("        $missingBindings = @($bindingStates | Where-Object { -not $_.Ready } | Select-Object -ExpandProperty Name)");
-            ps1.AppendLine($"        Write-Output \"WinUSB binding readiness attempt=$attempt ready=$readyBindingCount/$($selectedReceiverBindings.Count) missing=$($missingBindings -join '|') instances=$($readyInstances -join '|')\" >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("        if ($readyBindingCount -ge $selectedReceiverBindings.Count) { break }");
-            ps1.AppendLine("        if ($attempt -eq 4 -or $attempt -eq 8) {");
-            ps1.AppendLine("            $retryScanOutput = & pnputil.exe /scan-devices 2>&1");
-            ps1.AppendLine("            $retryScanExitCode = $LASTEXITCODE");
-            ps1.AppendLine($"            Write-Output \"PnP readiness rescan attempt=$attempt exitCode=$retryScanExitCode output=$($retryScanOutput -join ' | ')\" >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("        }");
-            ps1.AppendLine("    }");
-            ps1.AppendLine("    $finalBindingDevices = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object {");
-            ps1.AppendLine("        $instanceId = $_.InstanceId");
-            ps1.AppendLine("        @($selectedReceiverBindings | Where-Object { $instanceId -like $_.InstancePattern }).Count -gt 0");
-            ps1.AppendLine("    })");
-            ps1.AppendLine("    Write-PnpSnapshot -label 'receiver-after-restart' -devices $finalBindingDevices");
-            ps1.AppendLine("    if ($strongReenumerationFailures -gt 0) {");
-            ps1.AppendLine($"        Write-Output \"Receiver re-enumeration had non-fatal operation warnings count=$strongReenumerationFailures; final WinUSB readiness remains authoritative.\" >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("    }");
-            ps1.AppendLine("    if ($readyBindingCount -lt $selectedReceiverBindings.Count) {");
-            ps1.AppendLine($"        Write-Output \"Receiver binding re-enumeration failed missing=$($missingBindings -join '|') operationFailures=$strongReenumerationFailures.\" >> {PowerShellLiteral(wdiLog)}");
-            ps1.AppendLine("        $resultCodes += -1");
-            ps1.AppendLine("    }");
-            ps1.AppendLine("}");
-        }
-
         private async Task<bool> ValidateReceiverWinUsbTopologyAsync(
             string vidValue,
             string pidValue,
@@ -618,62 +573,70 @@ namespace ZeroCue.DataProbe.Services
                 return false;
             }
 
-            var receiverIdentity = SupportedScufDeviceProfile.ScufEnvisionPro.FindWirelessReceiver(vid, pid);
-            if (receiverIdentity == null)
+            var receiverIdentities = SupportedScufDeviceProfile.ScufEnvisionPro.WirelessReceiverIdentities
+                .Where(identity =>
+                    identity.VendorId == vid &&
+                    driverVariant.PidValues.Contains(identity.ProductId.ToString("X4"), StringComparer.OrdinalIgnoreCase))
+                .OrderByDescending(identity => identity.ProductId == pid)
+                .ToArray();
+            if (receiverIdentities.Length == 0)
             {
-                Log($"Receiver driver validation failed: selected identity VID=0x{vid:X4} PID=0x{pid:X4} is not in the runtime receiver profile.");
+                Log($"Receiver driver validation failed: variant={driverVariant.Name} selected identity VID=0x{vid:X4} PID=0x{pid:X4} has no matching runtime receiver states.");
                 return false;
             }
 
             const int maxAttempts = 8;
             const int retryDelayMs = 750;
-            Log($"Receiver topology validation start variant={driverVariant.Name} runtimeVariant={receiverIdentity.Variant} experimental={receiverIdentity.IsExperimental} VID=0x{vid:X4} PID=0x{pid:X4} topology={(receiverIdentity.UsesUnifiedActiveTransport ? "unified-active" : "dual-interface")} controlPipes=0x{receiverIdentity.ControlOutPipe:X2}/0x{receiverIdentity.ControlInPipe:X2} attempts={maxAttempts} delayMs={retryDelayMs}.");
+            Log($"Receiver topology validation start variant={driverVariant.Name} selectedIdentity=VID_0x{vid:X4}:PID_0x{pid:X4} candidateStates={string.Join(',', receiverIdentities.Select(identity => $"{identity.VendorId:X4}:{identity.ProductId:X4}[{(identity.UsesUnifiedActiveTransport ? "active" : "base")}]"))} attempts={maxAttempts} delayMs={retryDelayMs}.");
 
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
             {
-                bool runtimeReady = false;
-                bool radioReady = false;
                 Log($"Receiver topology validation attempt={attempt}/{maxAttempts}.");
 
-                try
+                foreach (var receiverIdentity in receiverIdentities)
                 {
-                    using (var runtimeTransport = new WirelessDongleWinUsbTransport(
-                        message => Log($"receiver validation: {message}"),
-                        WirelessWinUsbInterfaceTarget.RuntimeMi04,
-                        logReadPayloads: false,
-                        receiverIdentity: receiverIdentity))
+                    bool runtimeReady = false;
+                    bool radioReady = false;
+                    try
                     {
-                        using var runtimeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                        runtimeReady = await runtimeTransport.ConnectAsync(runtimeTimeout.Token);
-                        await runtimeTransport.DisconnectAsync();
-                    }
-
-                    if (runtimeReady && receiverIdentity.UsesDedicatedRadioInterface)
-                    {
-                        using var radioTransport = new WirelessDongleWinUsbTransport(
+                        using (var runtimeTransport = new WirelessDongleWinUsbTransport(
                             message => Log($"receiver validation: {message}"),
-                            WirelessWinUsbInterfaceTarget.RadioMi03,
+                            WirelessWinUsbInterfaceTarget.RuntimeMi04,
                             logReadPayloads: false,
-                            receiverIdentity: receiverIdentity);
-                        using var radioTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-                        radioReady = await radioTransport.ConnectAsync(radioTimeout.Token);
-                        await radioTransport.DisconnectAsync();
-                    }
-                    else if (runtimeReady)
-                    {
-                        radioReady = true;
-                    }
-                }
-                catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is TimeoutException || ex is OperationCanceledException)
-                {
-                    Log($"Receiver topology validation attempt={attempt} transient failure: {ex.Message}");
-                }
+                            receiverIdentity: receiverIdentity))
+                        {
+                            using var runtimeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                            runtimeReady = await runtimeTransport.ConnectAsync(runtimeTimeout.Token);
+                            await runtimeTransport.DisconnectAsync();
+                        }
 
-                Log($"Receiver topology validation attempt={attempt} runtimeControl={runtimeReady} dedicatedRadio={(receiverIdentity.UsesDedicatedRadioInterface ? (bool?)radioReady : null)} unifiedActive={receiverIdentity.UsesUnifiedActiveTransport}.");
-                if (runtimeReady && radioReady)
-                {
-                    Log($"Receiver driver validation succeeded variant={receiverIdentity.Variant} experimental={receiverIdentity.IsExperimental} VID=0x{vid:X4} PID=0x{pid:X4} topology={(receiverIdentity.UsesUnifiedActiveTransport ? "single active interface" : "MI_04 control plus MI_03 input")} controlPipes=0x{receiverIdentity.ControlOutPipe:X2}/0x{receiverIdentity.ControlInPipe:X2}.");
-                    return true;
+                        if (runtimeReady && receiverIdentity.UsesDedicatedRadioInterface)
+                        {
+                            using var radioTransport = new WirelessDongleWinUsbTransport(
+                                message => Log($"receiver validation: {message}"),
+                                WirelessWinUsbInterfaceTarget.RadioMi03,
+                                logReadPayloads: false,
+                                receiverIdentity: receiverIdentity);
+                            using var radioTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                            radioReady = await radioTransport.ConnectAsync(radioTimeout.Token);
+                            await radioTransport.DisconnectAsync();
+                        }
+                        else if (runtimeReady)
+                        {
+                            radioReady = true;
+                        }
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is InvalidOperationException || ex is TimeoutException || ex is OperationCanceledException)
+                    {
+                        Log($"Receiver topology validation attempt={attempt} identity=VID_0x{receiverIdentity.VendorId:X4}:PID_0x{receiverIdentity.ProductId:X4} transient failure: {ex.Message}");
+                    }
+
+                    Log($"Receiver topology validation attempt={attempt} identity=VID_0x{receiverIdentity.VendorId:X4}:PID_0x{receiverIdentity.ProductId:X4} runtimeControl={runtimeReady} dedicatedRadio={(receiverIdentity.UsesDedicatedRadioInterface ? (bool?)radioReady : null)} unifiedActive={receiverIdentity.UsesUnifiedActiveTransport}.");
+                    if (runtimeReady && radioReady)
+                    {
+                        Log($"Receiver driver validation succeeded detectedState={(receiverIdentity.UsesUnifiedActiveTransport ? "controller-active" : "receiver-base")} variant={receiverIdentity.Variant} experimental={receiverIdentity.IsExperimental} VID=0x{receiverIdentity.VendorId:X4} PID=0x{receiverIdentity.ProductId:X4} topology={(receiverIdentity.UsesUnifiedActiveTransport ? "single active interface" : "MI_04 control plus MI_03 input")} controlPipes=0x{receiverIdentity.ControlOutPipe:X2}/0x{receiverIdentity.ControlInPipe:X2}.");
+                        return true;
+                    }
                 }
 
                 if (attempt < maxAttempts)
@@ -682,7 +645,7 @@ namespace ZeroCue.DataProbe.Services
                 }
             }
 
-            Log($"Receiver driver validation failed after bounded re-enumeration retries: identity VID=0x{vid:X4} PID=0x{pid:X4} must expose its 64-byte control pair OUT 0x{receiverIdentity.ControlOutPipe:X2} / IN 0x{receiverIdentity.ControlInPipe:X2}{(receiverIdentity.UsesDedicatedRadioInterface ? " and its dedicated MI_03 IN 0x81 interface" : " on the unified active interface")} through WinUSB.");
+            Log($"Receiver driver validation failed after bounded re-enumeration retries: none of the current states for variant={driverVariant.Name} ({string.Join(',', receiverIdentities.Select(identity => $"VID_0x{identity.VendorId:X4}:PID_0x{identity.ProductId:X4}"))}) exposed its required WinUSB topology. The receiver may have changed state while validation was running.");
             return false;
         }
 

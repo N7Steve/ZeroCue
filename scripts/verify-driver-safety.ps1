@@ -177,11 +177,13 @@ $requiredPortableTargets = @(
     'DeleteOwnedDriverPackageManifest(config);',
     'ValidateReceiverWinUsbTopologyAsync(selectedVid, selectedPid, selectedVariant!)',
     'Keeping the completed driver bindings so reconnecting or rerunning can converge without destructive rollback.',
-    'AppendReceiverBindingReenumerationScript(ps1, config, wdiLog)',
-    'pnputil.exe /restart-device $bindingDevice.InstanceId',
-    'PnP restart exact receiver binding=',
-    'final WinUSB readiness remains authoritative',
-    'Receiver binding re-enumeration failed',
+    'function Get-StagedWinUsbInf',
+    '$allowAbsent -and $existingDevices.Count -eq 0 -and $stagedInf',
+    'Binding transitioned to another receiver state after package staging',
+    '$_.Variant -eq $selectedVariant',
+    '$allowAbsentRequiredBindings = $true',
+    '$presentReady = ($allowAbsentRequiredBindings -and $matchingDevices.Count -eq 0)',
+    'selectedVariant.Bindings.Length',
     'Write-PnpSnapshot -label ''selected-before-install''',
     'selection-failed-all-vendor-nodes-including-phantoms',
     'Write-PnpBasicSnapshot',
@@ -193,12 +195,15 @@ $requiredPortableTargets = @(
     'Start-Transcript -LiteralPath',
     'LogFileContents(restoreLogPath',
     'Receiver topology validation attempt={attempt}/{maxAttempts}',
+    'candidateStates=',
+    'detectedState=',
+    'driverVariant.PidValues.Contains',
     'await runtimeTransport.DisconnectAsync();',
     'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} install")',
     'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} {operationName}")',
     'TimeSpan.FromMinutes(20)',
     'process.Kill(entireProcessTree: true)',
-    'identity VID=0x{vid:X4} PID=0x{pid:X4} must expose its 64-byte control pair'
+    'none of the current states for variant={driverVariant.Name}'
 )
 
 foreach ($fragment in $requiredPortableTargets) {

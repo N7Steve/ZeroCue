@@ -6,6 +6,7 @@ namespace ZeroCue.DataProbe.Services
     internal static class WindowsStartupService
     {
         private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string StartupApprovedRunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
         private const string ValueName = "ZeroCue";
         private const string MinimizedArgument = "--minimized";
 
@@ -40,6 +41,7 @@ namespace ZeroCue.DataProbe.Services
             if (!enabled)
             {
                 key.DeleteValue(ValueName, throwOnMissingValue: false);
+                ClearStartupApprovalOverride();
                 return;
             }
 
@@ -56,6 +58,20 @@ namespace ZeroCue.DataProbe.Services
             }
 
             key.SetValue(ValueName, command, RegistryValueKind.String);
+
+            // Windows keeps a separate disabled/enabled state for entries shown in
+            // Task Manager's Startup Apps page. Rewriting the Run value does not
+            // clear a previous disabled state, so the ZeroCue setting could remain
+            // checked while Windows silently skipped it at sign-in. With ZeroCue's
+            // own setting enabled, let the Run entry be active again by removing
+            // that per-entry override.
+            ClearStartupApprovalOverride();
+        }
+
+        private static void ClearStartupApprovalOverride()
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(StartupApprovedRunKeyPath, writable: true);
+            key?.DeleteValue(ValueName, throwOnMissingValue: false);
         }
     }
 }

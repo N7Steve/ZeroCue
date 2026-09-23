@@ -111,18 +111,22 @@ use one unified 64-byte WinUSB transport on `OUT 0x01` / `IN 0x81`; ZeroCue keep
 one reader on that shared ACK/input endpoint. Base identities continue to use
 `MI_04` (`0x02` / `0x82`) for control and `MI_03` (`IN 0x81`) for input.
 
-If the required WinUSB endpoints are not immediately available after
-installation, ZeroCue removes and rescans only the exact base `MI_03` device node
-to force Windows to publish its new WinUSB interface, while restarting the other
-selected binding normally. Active whole-device bindings are restarted directly.
-Validation and diagnostics use bounded retries and timeouts. If validation still
-fails, ZeroCue reports the detected topology and starts an exact automatic
-rollback. Recovery also waits for every previously present interface to return on
-its original driver before reporting success. Installation diagnostics include
-present and phantom vendor PnP nodes, parent and problem-code properties, WinUSB
-binding readiness, bounded rescan output, and the final `wdi-simple` output.
-Automatic rollback also records a complete PowerShell and `pnputil` transcript in
-the communication log.
+The wired V2 installer applies bindings in the deterministic order `MI_04`,
+`MI_03`, then `MI_00`, including `1B1C:3A04`. Each binding gets up to three
+complete `wdi-simple` attempts. ZeroCue lets the helper finish normally, rescans
+PnP, waits for every exact matching instance to report the WinUSB service, and
+then runs an idempotent convergence pass to repair any interface displaced while
+the composite device re-enumerated.
+
+Receiver bindings are restarted and rescanned without removing a successfully
+installed device node. A restart or endpoint-probe warning does not undo valid
+WinUSB bindings; the final state of every required PnP binding is authoritative.
+Partial packages are retained in the ownership manifest so a later retry can
+converge and the explicit restore action can still recover them. Recovery waits
+for every previously present interface to return on its original driver before
+reporting success. Installation diagnostics include present and phantom vendor
+PnP nodes, parent and problem-code properties, per-attempt debug output, binding
+readiness, and bounded rescan output.
 
 ZeroCue is not required for recovery. You can use Windows Device Manager as an
 administrator, locate only the SCUF controller or receiver interfaces modified by

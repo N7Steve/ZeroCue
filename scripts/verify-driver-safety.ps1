@@ -161,20 +161,26 @@ $requiredPortableTargets = @(
     '$candidateDevices.Count -gt 0',
     '$selectionAttempt -le 6',
     'Driver target selection attempt=$selectionAttempt/6',
-    'if ($interfaceId -ge 0) { $argsArray += @(''-i'', $interfaceId) }',
-    "'-o', '15000'",
+    'if ($interfaceId -ge 0) { $argsArray += @(''-i'', [string]$interfaceId) }',
+    "'-o', '30000', '-l', '0'",
+    '$proc.WaitForExit(90000)',
+    '$driverAttempt -le 3',
+    '$alreadyReady',
+    '$firstPassResultCodes',
+    'Starting WinUSB convergence pass',
+    'Final WinUSB readiness attempt=',
+    "Where-Object { `$_.Service -notmatch '^WinUSB`$' }",
     'taskkill.exe /PID $proc.Id /T /F',
     'install diagnostics retained at:',
     'resultCodes.Length == expectedResultCount',
     'Where(package => File.Exists(Path.Combine(windowsInfDirectory, package)))',
     'DeleteOwnedDriverPackageManifest(config);',
     'ValidateReceiverWinUsbTopologyAsync(selectedVid, selectedPid, selectedVariant!)',
-    'ScopeToIdentity(selectedVid, selectedPid)',
-    'operationName: "automatic rollback"',
+    'Keeping the completed driver bindings so reconnecting or rerunning can converge without destructive rollback.',
     'AppendReceiverBindingReenumerationScript(ps1, config, wdiLog)',
     'pnputil.exe /restart-device $bindingDevice.InstanceId',
-    'pnputil.exe /remove-device $bindingDevice.InstanceId',
-    'PnP strong re-enumeration remove exact MI_03',
+    'PnP restart exact receiver binding=',
+    'final WinUSB readiness remains authoritative',
     'Receiver binding re-enumeration failed',
     'Write-PnpSnapshot -label ''selected-before-install''',
     'selection-failed-all-vendor-nodes-including-phantoms',
@@ -190,7 +196,7 @@ $requiredPortableTargets = @(
     'await runtimeTransport.DisconnectAsync();',
     'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} install")',
     'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} {operationName}")',
-    'TimeSpan.FromMinutes(4)',
+    'TimeSpan.FromMinutes(20)',
     'process.Kill(entireProcessTree: true)',
     'identity VID=0x{vid:X4} PID=0x{pid:X4} must expose its 64-byte control pair'
 )
@@ -199,6 +205,21 @@ foreach ($fragment in $requiredPortableTargets) {
     if ($source.IndexOf($fragment, [System.StringComparison]::Ordinal) -lt 0) {
         throw "Required portable driver target is missing: $fragment"
     }
+}
+
+$pid3A04Mi04 = $source.IndexOf('new DriverBinding("0x3A04", 4, "interface 4 (MI_04)")', [System.StringComparison]::Ordinal)
+$pid3A04Mi03 = $source.IndexOf('new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")', [System.StringComparison]::Ordinal)
+$pid3A04Mi00 = $source.IndexOf('new DriverBinding("0x3A04", 0, "interface 0 (MI_00)")', [System.StringComparison]::Ordinal)
+if (-not ($pid3A04Mi04 -lt $pid3A04Mi03 -and $pid3A04Mi03 -lt $pid3A04Mi00)) {
+    throw "VID_1B1C/PID_3A04 must install deterministically in MI_04, MI_03, MI_00 order."
+}
+
+if ($source -match 'WINUSB detected on .*Stopping the unresponsive wdi-simple process') {
+    throw "wdi-simple must be allowed to finish package installation after WinUSB first appears."
+}
+
+if ($source -match 'PnP strong re-enumeration remove exact MI_03') {
+    throw "A successful receiver binding must be restarted, not removed, during convergence."
 }
 
 if ($source -match 'new DriverBinding\([^\r\n]*[A-Fa-f0-9]{64}') {

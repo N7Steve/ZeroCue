@@ -216,7 +216,10 @@ namespace ZeroCue.DataProbe.Services
                         throw new IOException($"WinUsb_WritePipe failed win32={err} {new System.ComponentModel.Win32Exception(err).Message}");
                     }
 
-                    LogTransport($"WRITE WinUSB OK pipe=0x{_outPipeId:X2} bytes={transferred} durationMs={sw.ElapsedMilliseconds} payload={ScufReportBuilder.ToHex(report)}");
+                    if (_logReadPayloads)
+                    {
+                        LogTransport($"WRITE WinUSB OK pipe=0x{_outPipeId:X2} bytes={transferred} durationMs={sw.ElapsedMilliseconds} payload={ScufReportBuilder.ToHex(report)}");
+                    }
                 }
             }, ct);
         }
@@ -268,8 +271,7 @@ namespace ZeroCue.DataProbe.Services
 
                     if (err == WinUsbInterop.ERROR_GEN_FAILURE)
                     {
-                        LogTransport($"READ WinUSB ERROR_GEN_FAILURE pipe=0x{_inPipeId:X2} durationMs={sw.ElapsedMilliseconds}. Clearing stall and treating as recoverable.");
-                        WinUsbInterop.WinUsb_ResetPipe(_winUsbHandle, _inPipeId);
+                        LogTransport($"READ WinUSB ERROR_GEN_FAILURE pipe=0x{_inPipeId:X2} durationMs={sw.ElapsedMilliseconds}. Treating as transient without resetting the shared device pipe.");
                         Thread.Sleep(5);
                         return (false, 0);
                     }

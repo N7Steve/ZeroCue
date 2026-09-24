@@ -24,11 +24,21 @@ namespace ZeroCue.DataProbe.Services
             if (connected)
             {
                 Interlocked.Exchange(ref _nextWirelessAutoProbeTimestamp, 0);
+                Interlocked.Exchange(ref _wirelessAutoProbeFailureCount, 0);
             }
             else if (autoConnect)
             {
-                var cooldownTicks = 10L * Stopwatch.Frequency;
+                var failureCount = Interlocked.Increment(ref _wirelessAutoProbeFailureCount);
+                var cooldownSeconds = failureCount switch
+                {
+                    1 => 2,
+                    2 => 5,
+                    3 => 10,
+                    _ => 30
+                };
+                var cooldownTicks = cooldownSeconds * (long)Stopwatch.Frequency;
                 Interlocked.Exchange(ref _nextWirelessAutoProbeTimestamp, Stopwatch.GetTimestamp() + cooldownTicks);
+                LogInput($"[WIRELESS-WINUSB] Siguiente intento automatico en {cooldownSeconds}s tras {failureCount} fallo(s) consecutivo(s).");
             }
 
             return connected;
@@ -81,7 +91,8 @@ namespace ZeroCue.DataProbe.Services
                         ReplayDelayCapMs = 0,
                         ReplayReportLimit = null,
                         RequireRuntimeSetValidation = true,
-                        EnableFileLogging = true,
+                        EnableFileLogging = false,
+                        EnableProtocolTrace = false,
                         RadioPumpReadDelayMs = 2,
                         RadioInputFrameObserver = (frame, length) =>
                         {

@@ -84,6 +84,7 @@ namespace ZeroCue.DataProbe.Services
         private const long WirelessAnalogProcessMinIntervalMs = 4;
         private long _lastWirelessAnalogProcessMs;
         private int _lastWirelessDigitalSignature = -1;
+        private readonly object _wirelessInputProcessingLock = new object();
         private readonly object _wirelessInputFrameLock = new object();
         private byte[]? _lastWirelessRadioInputFrame;
         private long _wirelessRuntimeG4LastSeenMs;

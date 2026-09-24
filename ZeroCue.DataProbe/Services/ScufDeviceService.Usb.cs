@@ -26,6 +26,7 @@ namespace ZeroCue.DataProbe.Services
         private readonly SemaphoreSlim _connectionAttemptGate = new(1, 1);
         private int _connectionSuspensionCount;
         private long _nextWirelessAutoProbeTimestamp;
+        private int _wirelessAutoProbeFailureCount;
 
         public async Task<IDisposable> SuspendConnectionsAsync()
         {

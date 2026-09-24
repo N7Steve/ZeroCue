@@ -43,8 +43,14 @@ namespace ZeroCue.DataProbe.Services
         private readonly Dictionary<string, CancellationTokenSource> _macroPlaybackCancellations = new Dictionary<string, CancellationTokenSource>();
         private readonly Dictionary<string, int> _macroOutputRefs = new Dictionary<string, int>();
         private readonly HashSet<string> _macroFrameTargets = new HashSet<string>();
-        private long _lastXInputVerifyLogMs;
-        private string _lastXInputVerifySignature = string.Empty;
+        private const int XInputMismatchMinimumSamples = 3;
+        private const int XInputMismatchPersistenceMs = 100;
+        private const int XInputMismatchRepeatLogMs = 5000;
+        private string _pendingXInputMismatchSignature = string.Empty;
+        private long _pendingXInputMismatchSinceMs;
+        private int _pendingXInputMismatchSamples;
+        private string _lastReportedXInputMismatchSignature = string.Empty;
+        private long _lastReportedXInputMismatchMs;
 
         public Dictionary<string, Dictionary<string, string>> AdvancedRemapTable { get; private set; } = new Dictionary<string, Dictionary<string, string>>();
         public Dictionary<string, Dictionary<string, string>> ShiftAdvancedRemapTable { get; private set; } = new Dictionary<string, Dictionary<string, string>>();
@@ -1374,12 +1380,14 @@ namespace ZeroCue.DataProbe.Services
 
             var code = XInputGetState((uint)userIndex, out var state);
             var currentVigemButtons = _xbox.ButtonState;
-            var signature = $"{userIndex}:{code}:{state.PacketNumber}:{state.Gamepad.Buttons:X4}:{state.Gamepad.LeftTrigger}:{state.Gamepad.RightTrigger}:{expectedXInputButtons:X4}:{expectedVigemButtons:X4}:{currentVigemButtons:X4}:{expectedLt}:{expectedRt}";
             var now = Environment.TickCount64;
 
             if (code != 0)
             {
-                LogXInputVerify($"[VIGEM-XINPUT] WARN slot={userIndex} XInputGetState code={code}", signature, now);
+                ObserveXInputMismatch(
+                    $"[VIGEM-XINPUT] WARN slot={userIndex} XInputGetState code={code}",
+                    $"{userIndex}:code:{code}",
+                    now);
                 return;
             }
 
@@ -1389,30 +1397,52 @@ namespace ZeroCue.DataProbe.Services
 
             if (!buttonsMatch || !triggerMatch || !vigemButtonsMatch)
             {
-                LogXInputVerify(
+                var signature = $"{userIndex}:mismatch:{state.Gamepad.Buttons:X4}:{state.Gamepad.LeftTrigger}:{state.Gamepad.RightTrigger}:{expectedXInputButtons:X4}:{expectedVigemButtons:X4}:{currentVigemButtons:X4}:{expectedLt}:{expectedRt}";
+                ObserveXInputMismatch(
                     $"[VIGEM-XINPUT] WARN slot={userIndex} expectedButtons=0x{expectedXInputButtons:X4} vigemExpected=0x{expectedVigemButtons:X4} vigemState=0x{currentVigemButtons:X4} actualButtons=0x{state.Gamepad.Buttons:X4} expectedLT={expectedLt} actualLT={state.Gamepad.LeftTrigger} expectedRT={expectedRt} actualRT={state.Gamepad.RightTrigger} packet={state.PacketNumber}",
                     signature,
                     now);
             }
-            else if (expectedXInputButtons != 0 || expectedVigemButtons != 0 || expectedLt != 0 || expectedRt != 0)
+            else
             {
-                LogXInputVerify(
-                    $"[VIGEM-XINPUT] OK slot={userIndex} buttons=0x{state.Gamepad.Buttons:X4} vigemState=0x{currentVigemButtons:X4} LT={state.Gamepad.LeftTrigger} RT={state.Gamepad.RightTrigger} packet={state.PacketNumber}",
-                    signature,
-                    now);
+                ClearPendingXInputMismatch();
             }
         }
 
-        private void LogXInputVerify(string message, string signature, long now)
+        private void ObserveXInputMismatch(string message, string signature, long now)
         {
-            if (signature == _lastXInputVerifySignature && now - _lastXInputVerifyLogMs < 500)
+            if (signature != _pendingXInputMismatchSignature)
+            {
+                _pendingXInputMismatchSignature = signature;
+                _pendingXInputMismatchSinceMs = now;
+                _pendingXInputMismatchSamples = 1;
+                return;
+            }
+
+            _pendingXInputMismatchSamples++;
+            var persistentForMs = now - _pendingXInputMismatchSinceMs;
+            if (_pendingXInputMismatchSamples < XInputMismatchMinimumSamples ||
+                persistentForMs < XInputMismatchPersistenceMs)
             {
                 return;
             }
 
-            _lastXInputVerifySignature = signature;
-            _lastXInputVerifyLogMs = now;
-            LogInput(message);
+            if (signature == _lastReportedXInputMismatchSignature &&
+                now - _lastReportedXInputMismatchMs < XInputMismatchRepeatLogMs)
+            {
+                return;
+            }
+
+            _lastReportedXInputMismatchSignature = signature;
+            _lastReportedXInputMismatchMs = now;
+            LogInput($"{message} persistentMs={persistentForMs} samples={_pendingXInputMismatchSamples}");
+        }
+
+        private void ClearPendingXInputMismatch()
+        {
+            _pendingXInputMismatchSignature = string.Empty;
+            _pendingXInputMismatchSinceMs = 0;
+            _pendingXInputMismatchSamples = 0;
         }
 
         private ushort BuildExpectedXInputButtons()

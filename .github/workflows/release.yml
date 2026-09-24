@@ -75,20 +75,21 @@ jobs:
           @"
           ZeroCue public alpha for Windows x64.
 
-          This build fixes rumble getting stuck on wired SCUF Envision controllers:
+          This build improves wireless stability and keeps diagnostic logs bounded:
 
-          - Queues and coalesces ViGEm motor feedback while the shared USB channel
-            is busy instead of silently dropping commands after 10 milliseconds.
-          - Guarantees delivery of the newest motor state, especially the 0/0 stop
-            command that releases a controller's latched vibration state.
-          - Sends an explicit motor stop and waits for it before releasing the USB
-            writer during controller or application shutdown.
-          - Reports partial or failed wired rumble writes and shutdown stop timeouts
-            in the ZeroCue log for future diagnostics.
-
-          This addresses vibration that could start during gameplay, continue after
-          the game exited, and stop only after vibration was disabled in-game or in
-          ZeroCue.
+          - Serializes wireless input-frame processing to prevent concurrent
+            collection updates from terminating an otherwise healthy session.
+          - Treats transient WinUSB general failures without resetting a shared
+            device pipe, and spaces heartbeat failures before declaring a session
+            lost.
+          - Adds progressive 2, 5, 10, and 30 second retry delays after consecutive
+            failed wireless probes while leaving manual connection attempts immediate.
+          - Rotates each ZeroCue log at 4 MiB and retains three segments, limiting
+            each log type to approximately 12 MiB.
+          - Disables high-volume protocol traces during normal use and reduces the
+            wireless pump status message to one every 30 seconds.
+          - Logs ViGEm/XInput mismatches only when they persist instead of recording
+            every successful sample or a transient asynchronous mismatch.
 
           ViGEmBus 1.22.0 must be installed before ZeroCue's WinUSB driver. Driver
           installation is required for the connection mode you use: install the

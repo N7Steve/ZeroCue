@@ -40,6 +40,7 @@ namespace ZeroCue.DataProbe.Services
         public Action<byte[], int>? RadioInputFrameObserver { get; init; }
         public Action? ControllerActivityObserver { get; init; }
         public bool EnableFileLogging { get; init; } = true;
+        public bool EnableProtocolTrace { get; init; }
         public int RadioPumpReadDelayMs { get; init; }
     }
 
@@ -117,7 +118,10 @@ namespace ZeroCue.DataProbe.Services
                     WirelessDongleWinUsbTransport? radioTransport = null;
                     CancellationTokenSource? radioPumpCts = null;
                     Task? radioPumpTask = null;
-                    var runtimeTransport = new WirelessDongleWinUsbTransport(Log, WirelessWinUsbInterfaceTarget.RuntimeMi04);
+                    var runtimeTransport = new WirelessDongleWinUsbTransport(
+                        Log,
+                        WirelessWinUsbInterfaceTarget.RuntimeMi04,
+                        logReadPayloads: _options.EnableProtocolTrace);
                     if (!await runtimeTransport.ConnectAsync(ct))
                     {
                         error = "No wireless receiver WinUSB candidate exposed the identity-specific 64-byte control pipe pair (base 0x02/0x82 or active 0x01/0x81).";
@@ -396,14 +400,14 @@ namespace ZeroCue.DataProbe.Services
             {
                 ct.ThrowIfCancellationRequested();
                 var report = reports[i];
-                Log($"REPLAY index={i:D3} ts={report.RelativeTimestampMs} name={report.Name} payload={ScufReportBuilder.ToHex(report.Payload64)}");
+                Trace($"REPLAY index={i:D3} ts={report.RelativeTimestampMs} name={report.Name} payload={ScufReportBuilder.ToHex(report.Payload64)}");
                 await transport.WriteReportAsync(report.Payload64, ct);
 
                 try
                 {
                     var ack = await ReadAckAsync(transport, report.ExpectedAckChannel, report.ExpectedOpcode, ct);
                     var status = ack.Length > 3 ? ack[3] : (byte)0xFF;
-                    Log($"REPLAY ACK index={i:D3} channel=0x{ack[1]:X2} opcode=0x{ack[2]:X2} status=0x{status:X2} raw={ScufReportBuilder.ToHex(ack)}");
+                    Trace($"REPLAY ACK index={i:D3} channel=0x{ack[1]:X2} opcode=0x{ack[2]:X2} status=0x{status:X2} raw={ScufReportBuilder.ToHex(ack)}");
                 }
                 catch (TimeoutException ex)
                 {
@@ -434,7 +438,7 @@ namespace ZeroCue.DataProbe.Services
             var cappedDelay = Math.Min(report.DelayAfterMs, _options.ReplayDelayCapMs.Value);
             if (cappedDelay != report.DelayAfterMs)
             {
-                Log($"REPLAY delay capped name={report.Name} capturedDelayAfterMs={report.DelayAfterMs} usedDelayAfterMs={cappedDelay}");
+                Trace($"REPLAY delay capped name={report.Name} capturedDelayAfterMs={report.DelayAfterMs} usedDelayAfterMs={cappedDelay}");
             }
 
             return cappedDelay;
@@ -447,7 +451,6 @@ namespace ZeroCue.DataProbe.Services
             var lastLogMs = 0L;
             var readCount = 0;
             var timeoutCount = 0;
-            var lastFrame = Array.Empty<byte>();
             var readDelayMs = Math.Max(0, _options.RadioPumpReadDelayMs);
             using var inputMapLogger = new WirelessWinUsbInputMapLogger(Log, enableLogging);
 
@@ -464,7 +467,6 @@ namespace ZeroCue.DataProbe.Services
                         var observedFrame = CopyFrame(buffer, bytesRead);
                         _options.ControllerActivityObserver?.Invoke();
                         _options.RadioInputFrameObserver?.Invoke(observedFrame, observedFrame.Length);
-                        lastFrame = observedFrame;
                         if (readDelayMs > 0)
                         {
                             await Task.Delay(readDelayMs, ct);
@@ -475,11 +477,10 @@ namespace ZeroCue.DataProbe.Services
                         timeoutCount++;
                     }
 
-                    if (readCount == 1 || sw.ElapsedMilliseconds - lastLogMs >= 1000)
+                    if (readCount == 1 || sw.ElapsedMilliseconds - lastLogMs >= 30_000)
                     {
                         lastLogMs = sw.ElapsedMilliseconds;
-                        var frame = lastFrame.Length > 0 ? ScufReportBuilder.ToHex(lastFrame) : "<none>";
-                        Log($"Auxiliary radio input pump status elapsedMs={sw.ElapsedMilliseconds} reads={readCount} timeouts={timeoutCount} lastFrame={frame}");
+                        Log($"Auxiliary radio input pump status elapsedMs={sw.ElapsedMilliseconds} reads={readCount} timeouts={timeoutCount}");
                     }
                 }
                 catch (OperationCanceledException)
@@ -605,7 +606,7 @@ namespace ZeroCue.DataProbe.Services
 
         private async Task<bool> SendHeartbeatOnceAsync(WirelessDongleWinUsbTransport transport, string label, CancellationToken ct)
         {
-            Log($"HEARTBEAT {label} payload={ScufReportBuilder.ToHex(ScufWirelessReports.BuildKeepAlive())}");
+            Trace($"HEARTBEAT {label} payload={ScufReportBuilder.ToHex(ScufWirelessReports.BuildKeepAlive())}");
             await transport.WriteReportAsync(ScufWirelessReports.BuildKeepAlive(), ct);
             try
             {
@@ -614,7 +615,7 @@ namespace ZeroCue.DataProbe.Services
                 if (status == 0x00)
                 {
                     _heartbeatOkCount++;
-                    Log($"HEARTBEAT OK {label} raw={ScufReportBuilder.ToHex(ack)}");
+                    Trace($"HEARTBEAT OK {label} raw={ScufReportBuilder.ToHex(ack)}");
                     return true;
                 }
 
@@ -649,10 +650,10 @@ namespace ZeroCue.DataProbe.Services
                 {
                     if (ignoredFrames > 0)
                     {
-                        Log($"ACK matched after ignoring {ignoredFrames} non-matching frame(s).");
+                        Trace($"ACK matched after ignoring {ignoredFrames} non-matching frame(s).");
                     }
 
-                    Log($"ACK candidate expectedChannel=0x{expectedAckChannel:X2} expectedOpcode=0x{expectedOpcode:X2} raw={ScufReportBuilder.ToHex(ack)}");
+                    Trace($"ACK candidate expectedChannel=0x{expectedAckChannel:X2} expectedOpcode=0x{expectedOpcode:X2} raw={ScufReportBuilder.ToHex(ack)}");
                     _options.ControllerActivityObserver?.Invoke();
                     return ack;
                 }
@@ -660,7 +661,7 @@ namespace ZeroCue.DataProbe.Services
                 ignoredFrames++;
                 if (ignoredFrames <= 3 || ignoredFrames % 25 == 0)
                 {
-                    Log($"ACK ignored frame count={ignoredFrames} firstByte=0x{ack[0]:X2} while waiting channel=0x{expectedAckChannel:X2} opcode=0x{expectedOpcode:X2}");
+                    Trace($"ACK ignored frame count={ignoredFrames} firstByte=0x{ack[0]:X2} while waiting channel=0x{expectedAckChannel:X2} opcode=0x{expectedOpcode:X2}");
                 }
 
                 await Task.Delay(1, ct);
@@ -689,6 +690,14 @@ namespace ZeroCue.DataProbe.Services
         {
             var line = $"[{DateTimeOffset.Now:HH:mm:ss.fff}] [WIRELESS-WINUSB] {message}";
             _uiLogger(line);
+        }
+
+        private void Trace(string message)
+        {
+            if (_options.EnableProtocolTrace)
+            {
+                Log(message);
+            }
         }
     }
 }

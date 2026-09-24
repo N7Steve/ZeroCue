@@ -8,6 +8,8 @@ namespace ZeroCue.DataProbe.Services
 {
     internal static class ZeroCueLog
     {
+        private const long MaximumLogFileBytes = 4L * 1024L * 1024L;
+        private const int RetainedFileCount = 3;
         private static readonly object InitLock = new();
         private static readonly object CommunicationLock = new();
         private static readonly object InputMappingLock = new();
@@ -77,33 +79,79 @@ namespace ZeroCue.DataProbe.Services
 
         public static void Communication(string message)
         {
-            Write(CommunicationLock, _communicationWriter, message);
+            Write(CommunicationLock, isCommunicationLog: true, message);
         }
 
         public static void InputMapping(string message)
         {
-            Write(InputMappingLock, _inputMappingWriter, message);
+            Write(InputMappingLock, isCommunicationLog: false, message);
         }
 
-        private static void Write(object sync, StreamWriter? writer, string message)
+        private static void Write(object sync, bool isCommunicationLog, string message)
         {
             Initialize();
-
-            writer ??= ReferenceEquals(sync, CommunicationLock)
-                ? _communicationWriter
-                : _inputMappingWriter;
 
             try
             {
                 lock (sync)
                 {
-                    writer?.WriteLine($"[{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}] {message}");
+                    var writer = isCommunicationLog ? _communicationWriter : _inputMappingWriter;
+                    if (writer == null)
+                    {
+                        return;
+                    }
+
+                    var line = $"[{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}] {message}";
+                    var pendingBytes = Encoding.UTF8.GetByteCount(line) + Encoding.UTF8.GetByteCount(Environment.NewLine);
+                    if (writer.BaseStream.Length + pendingBytes > MaximumLogFileBytes)
+                    {
+                        if (isCommunicationLog)
+                        {
+                            RotateWriter(ref _communicationWriter, CommunicationLogPath, "ZeroCue communication log (wired and wireless)");
+                            writer = _communicationWriter;
+                        }
+                        else
+                        {
+                            RotateWriter(ref _inputMappingWriter, InputMappingLogPath, "ZeroCue input and mapping log");
+                            writer = _inputMappingWriter;
+                        }
+                    }
+
+                    writer?.WriteLine(line);
                 }
             }
             catch
             {
                 // Logging is best effort and must not affect controller processing.
             }
+        }
+
+        private static void RotateWriter(ref StreamWriter? writer, string path, string title)
+        {
+            writer?.Dispose();
+            writer = null;
+
+            try
+            {
+                for (var index = RetainedFileCount - 1; index >= 1; index--)
+                {
+                    var destination = $"{path}.{index}";
+                    var source = index == 1 ? path : $"{path}.{index - 1}";
+                    if (File.Exists(source))
+                    {
+                        File.Move(source, destination, overwrite: true);
+                    }
+                }
+            }
+            catch
+            {
+                // If backup rotation is blocked, truncate the active segment below
+                // rather than permanently disabling logging.
+            }
+
+            writer = CreateWriter(path);
+            WriteHeader(writer, title);
+            writer.WriteLine($"=== Log rotated: maximum segment size {MaximumLogFileBytes / (1024 * 1024)} MiB; retained segments {RetainedFileCount} ===");
         }
 
         private static StreamWriter CreateWriter(string path)

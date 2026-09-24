@@ -10,6 +10,17 @@ namespace ZeroCue.DataProbe.Services
     {
         private void ProcessWirelessWinUsbInputFrame(byte[] buf, int len)
         {
+            // Runtime/control and auxiliary radio readers can both deliver input.
+            // All downstream gesture/remap state uses mutable collections and must
+            // be updated by only one reader at a time.
+            lock (_wirelessInputProcessingLock)
+            {
+                ProcessWirelessWinUsbInputFrameCore(buf, len);
+            }
+        }
+
+        private void ProcessWirelessWinUsbInputFrameCore(byte[] buf, int len)
+        {
             if (!TryNormalizeWirelessInputFrame(buf, len, out var frame))
             {
                 return;

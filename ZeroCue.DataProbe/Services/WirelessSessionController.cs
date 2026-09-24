@@ -104,11 +104,11 @@ namespace ZeroCue.DataProbe.Services
                 : long.MaxValue;
             while (!ct.IsCancellationRequested)
             {
+                var intervalMs = started.Elapsed < TimeSpan.FromSeconds(10)
+                    ? _initialHeartbeatIntervalMs
+                    : _steadyHeartbeatIntervalMs;
                 try
                 {
-                    var intervalMs = started.Elapsed < TimeSpan.FromSeconds(10)
-                        ? _initialHeartbeatIntervalMs
-                        : _steadyHeartbeatIntervalMs;
                     var delayTarget = DateTime.UtcNow.AddMilliseconds(intervalMs);
                     var drainBuffer = new byte[64];
                     while (DateTime.UtcNow < delayTarget && !ct.IsCancellationRequested)
@@ -186,6 +186,17 @@ namespace ZeroCue.DataProbe.Services
                 {
                     _heartbeatFailures++;
                     Log($"HEARTBEAT FAIL consecutiveFailures={_heartbeatFailures} error={ex.Message}");
+                    try
+                    {
+                        // A transport exception can be returned immediately. Keep
+                        // "consecutive failures" tied to heartbeat attempts instead
+                        // of exhausting the threshold in a tight loop.
+                        await Task.Delay(Math.Max(1, intervalMs), ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
                 }
 
                 var failureThreshold = started.ElapsedMilliseconds < _initialFailureThresholdWindowMs

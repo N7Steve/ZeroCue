@@ -93,7 +93,6 @@ namespace ZeroCue.DataProbe.Services
                         RequireRuntimeSetValidation = true,
                         EnableFileLogging = false,
                         EnableProtocolTrace = false,
-                        RadioPumpReadDelayMs = 2,
                         RadioInputFrameObserver = (frame, length) =>
                         {
                             BeginWirelessHandshakeStatus();

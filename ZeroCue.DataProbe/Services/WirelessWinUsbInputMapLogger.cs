@@ -10,6 +10,7 @@ namespace ZeroCue.DataProbe.Services
         private const long FrameLogMinIntervalMs = 20;
 
         private readonly Stopwatch _sw = Stopwatch.StartNew();
+        private readonly bool _enabled;
         private byte[] _lastFrame = Array.Empty<byte>();
         private int _sequence;
         private int _observedChanges;
@@ -22,6 +23,7 @@ namespace ZeroCue.DataProbe.Services
             bool enabled,
             string source = "WinUSB auxiliary radio input endpoint 0x81")
         {
+            _enabled = enabled;
             if (enabled)
             {
                 LogPath = ZeroCueLog.InputMappingLogPath;
@@ -40,7 +42,7 @@ namespace ZeroCue.DataProbe.Services
 
         public void ObserveFrame(byte[] buffer, int length)
         {
-            if (_disposed || length <= 0)
+            if (!_enabled || _disposed || length <= 0)
             {
                 return;
             }
@@ -78,7 +80,7 @@ namespace ZeroCue.DataProbe.Services
 
         public void LogStop(int readCount, int timeoutCount)
         {
-            if (_disposed)
+            if (!_enabled || _disposed)
             {
                 return;
             }

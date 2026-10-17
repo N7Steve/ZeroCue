@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
@@ -10,12 +11,28 @@ namespace ZeroCue.DataProbe.Services
     {
         private void ProcessWirelessWinUsbInputFrame(byte[] buf, int len)
         {
+            var arrivedAt = Stopwatch.GetTimestamp();
             // Runtime/control and auxiliary radio readers can both deliver input.
             // All downstream gesture/remap state uses mutable collections and must
             // be updated by only one reader at a time.
             lock (_wirelessInputProcessingLock)
             {
-                ProcessWirelessWinUsbInputFrameCore(buf, len);
+                var processingStarted = Stopwatch.GetTimestamp();
+                try
+                {
+                    ProcessWirelessWinUsbInputFrameCore(buf, len);
+                }
+                finally
+                {
+                    var completedAt = Stopwatch.GetTimestamp();
+                    if (IsConnected)
+                    {
+                        _wirelessProcessingTiming ??= new StageTimingTracker("PROCESS-PERF", "LockWait", "Process");
+                        var summary = _wirelessProcessingTiming.Observe(completedAt,
+                            processingStarted - arrivedAt, completedAt - processingStarted);
+                        if (summary != null) LogInput(summary);
+                    }
+                }
             }
         }
 
@@ -26,7 +43,13 @@ namespace ZeroCue.DataProbe.Services
                 return;
             }
 
-            if (!ShouldProcessWirelessInputFrame(frame))
+            var timestamp = Stopwatch.GetTimestamp();
+            var shouldProcess = ShouldProcessWirelessInputFrame(frame, timestamp);
+            if (IsConnected)
+            {
+                RecordWirelessInputPerformance(shouldProcess, timestamp);
+            }
+            if (!shouldProcess)
             {
                 return;
             }
@@ -188,8 +211,8 @@ namespace ZeroCue.DataProbe.Services
                 ("G5", activeGKeys.Contains("G5"))
             });
 
-            RaiseFrameProcessedThrottled();
             SubmitVirtualOutput(ltOut, rtOut, lx, ly, rx, ry);
+            RaiseFrameProcessedThrottled();
         }
 
         private bool TryNormalizeWirelessInputFrame(byte[] buf, int len, out byte[] frame)
@@ -225,6 +248,7 @@ namespace ZeroCue.DataProbe.Services
 
             if (validOffsets.Count == 1)
             {
+                RecordRadioInputPerformance(frame);
                 StoreWirelessRadioInputFrame(frame);
                 ApplyRecentWirelessRuntimeGKeys(frame);
                 return true;
@@ -260,9 +284,18 @@ namespace ZeroCue.DataProbe.Services
                 frame[11] = (byte)((frame[11] & 0x0F) | dpad.Value);
             }
 
+            RecordRadioInputPerformance(frame);
             StoreWirelessRadioInputFrame(frame);
             ApplyRecentWirelessRuntimeGKeys(frame);
             return true;
+        }
+
+        private void RecordRadioInputPerformance(byte[] frame)
+        {
+            if (!IsConnected) return;
+            _radioPerformanceTracker ??= new RadioPerformanceTracker();
+            var summary = _radioPerformanceTracker.Observe(frame, Stopwatch.GetTimestamp());
+            if (summary != null) LogInput(summary);
         }
 
         private bool TryNormalizeWirelessRuntimeGKeyFrame(byte[] buf, int len, out byte[] frame)
@@ -329,40 +362,68 @@ namespace ZeroCue.DataProbe.Services
 
         private void ResetWirelessRuntimeInputState()
         {
-            Interlocked.Exchange(ref _wirelessRuntimeG4LastSeenMs, 0);
-            Interlocked.Exchange(ref _wirelessRuntimeG5LastSeenMs, 0);
-            lock (_wirelessInputFrameLock)
+            lock (_wirelessInputProcessingLock)
             {
-                _lastWirelessRadioInputFrame = null;
+                Interlocked.Exchange(ref _wirelessRuntimeG4LastSeenMs, 0);
+                Interlocked.Exchange(ref _wirelessRuntimeG5LastSeenMs, 0);
+                _lastProcessedWirelessInputFrame = null;
+                _radioPerformanceTracker = null;
+                _wirelessProcessingTiming = null;
+                _outputPerformanceTracker = null;
+                _lastWirelessInputProcessTimestamp = 0;
+                _wirelessRateWindowTimestamp = 0;
+                _wirelessWindowReceivedFrames = 0;
+                _wirelessWindowProcessedFrames = 0;
+                lock (_wirelessInputFrameLock)
+                {
+                    _lastWirelessRadioInputFrame = null;
+                }
             }
         }
 
-        private bool ShouldProcessWirelessInputFrame(byte[] buf)
+        private bool ShouldProcessWirelessInputFrame(byte[] buf, long timestamp)
         {
-            var digitalSignature = BuildWirelessDigitalSignature(buf);
-            if (digitalSignature != Volatile.Read(ref _lastWirelessDigitalSignature))
+            // A minimum interval between *changed* analog states can halve the
+            // rate when nominally 4 ms packets arrive slightly early. Forward
+            // every new state, including analog changes and trigger edges.
+            // The caller serializes this gate with _wirelessInputProcessingLock.
+            if (_lastProcessedWirelessInputFrame == null ||
+                !buf.AsSpan(0, 16).SequenceEqual(_lastProcessedWirelessInputFrame))
             {
-                Volatile.Write(ref _lastWirelessDigitalSignature, digitalSignature);
-                Interlocked.Exchange(ref _lastWirelessAnalogProcessMs, Environment.TickCount64);
+                _lastProcessedWirelessInputFrame ??= new byte[16];
+                buf.AsSpan(0, 16).CopyTo(_lastProcessedWirelessInputFrame);
+                _lastWirelessInputProcessTimestamp = timestamp;
                 return true;
             }
 
-            var now = Environment.TickCount64;
-            var last = Interlocked.Read(ref _lastWirelessAnalogProcessMs);
-            if (now - last < WirelessAnalogProcessMinIntervalMs)
+            // Reprocess held states periodically for gestures/macros and paddle
+            // expiry. Use a high-resolution clock even for this duplicate gate.
+            if (Stopwatch.GetElapsedTime(_lastWirelessInputProcessTimestamp, timestamp).TotalMilliseconds < WirelessDuplicateProcessMinIntervalMs)
             {
                 return false;
             }
 
-            return Interlocked.CompareExchange(ref _lastWirelessAnalogProcessMs, now, last) == last;
+            _lastWirelessInputProcessTimestamp = timestamp;
+            return true;
         }
 
-        private static int BuildWirelessDigitalSignature(byte[] buf)
+        private void RecordWirelessInputPerformance(bool processed, long timestamp)
         {
-            var dpad = buf[11] & 0xF0;
-            var buttons = buf[12] | (buf[13] << 8) | (buf[14] << 16);
-            var saxR = (buf[15] & 0x01) << 24;
-            return buttons | (dpad << 20) | saxR;
+            if (_wirelessRateWindowTimestamp == 0)
+                _wirelessRateWindowTimestamp = timestamp;
+            _wirelessWindowReceivedFrames++;
+            if (processed) _wirelessWindowProcessedFrames++;
+
+            var elapsed = Stopwatch.GetElapsedTime(_wirelessRateWindowTimestamp, timestamp);
+            if (elapsed.TotalSeconds < 10) return;
+
+            // Aggregate only: no payload formatting or per-packet log writes.
+            // These rates describe normalized input and mapping decisions, not
+            // distinct XInput states or button-to-screen latency.
+            LogInput(FormattableString.Invariant($"[WIRELESS-PERF] normalizedHz={_wirelessWindowReceivedFrames / elapsed.TotalSeconds:F1} processedHz={_wirelessWindowProcessedFrames / elapsed.TotalSeconds:F1} received={_wirelessWindowReceivedFrames} processed={_wirelessWindowProcessedFrames} skippedDuplicates={_wirelessWindowReceivedFrames - _wirelessWindowProcessedFrames} windowMs={elapsed.TotalMilliseconds:F0}"));
+            _wirelessRateWindowTimestamp = timestamp;
+            _wirelessWindowReceivedFrames = 0;
+            _wirelessWindowProcessedFrames = 0;
         }
 
         private static List<string> GetWirelessWinUsbPaddles(byte[] buf)

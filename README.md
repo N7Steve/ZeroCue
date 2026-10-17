@@ -151,6 +151,9 @@ redact them before posting publicly.
 
 ## Reporting bugs
 
+For input-rate regressions and local performance checks, see
+[input performance validation](docs/input-performance.md).
+
 If ZeroCue fails, disconnects, or behaves unexpectedly, please
 [open a GitHub issue](https://github.com/N7Steve/ZeroCue/issues/new) and attach
 both logs listed above so the problem can be analyzed and fixed. Include the

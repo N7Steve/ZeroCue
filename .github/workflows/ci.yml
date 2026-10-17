@@ -44,5 +44,11 @@ jobs:
       - name: Build
         run: dotnet build ZeroCue.DataProbe/ZeroCue.DataProbe.csproj --configuration Release --no-restore
 
+      - name: Verify input concurrency and cancellation without hardware
+        run: dotnet run --project tests/ZeroCue.InputChecks/ZeroCue.InputChecks.csproj --configuration Release
+
+      - name: Verify native XInput probe counters and ABI without hardware
+        run: dotnet run --project tools/ZeroCue.XInputProbe/ZeroCue.XInputProbe.csproj --configuration Release -- --self-test
+
       - name: Audit NuGet packages
         run: dotnet list ZeroCue.DataProbe/ZeroCue.DataProbe.csproj package --vulnerable --include-transitive

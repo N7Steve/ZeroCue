@@ -285,7 +285,8 @@ namespace ZeroCue.DataProbe.Services
                     Log($"ACK ignored frame count={ignoredFrames} firstByte=0x{received[0]:X2} while waiting channel=0x{expectedAckChannel:X2} opcode=0x{expectedOpcode:X2}");
                 }
 
-                await Task.Delay(1, ct);
+                // Input and ACKs share this pipe on active receivers. Do not add
+                // a timer delay after input: the next USB read supplies the pacing.
             }
 
             throw new TimeoutException($"WirelessAckTimeout channel=0x{expectedAckChannel:X2} opcode=0x{expectedOpcode:X2}");

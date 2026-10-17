@@ -35,6 +35,9 @@ namespace ZeroCue.DataProbe.Services
         private bool _disposed;
         private readonly Stopwatch _connectClock = new();
         private bool _firstWriteLogged;
+        private StageTimingTracker? _readPerformanceTracker;
+        private long _lastSuccessfulReadTimestamp;
+        internal long LastSuccessfulReadTimestamp => Interlocked.Read(ref _lastSuccessfulReadTimestamp);
 
         public WirelessDongleWinUsbTransport(
             Action<string> logger,
@@ -59,6 +62,8 @@ namespace ZeroCue.DataProbe.Services
         public async Task<bool> ConnectAsync(CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
+            _readPerformanceTracker = null;
+            Interlocked.Exchange(ref _lastSuccessfulReadTimestamp, 0);
             _connectClock.Restart();
             _firstWriteLogged = false;
             LogTransport("=== Wireless WinUSB transport connect ===");
@@ -238,9 +243,11 @@ namespace ZeroCue.DataProbe.Services
 
             ct.ThrowIfCancellationRequested();
             var effectiveTimeoutMs = timeoutMs <= 0 ? DefaultReadTimeoutMs : timeoutMs;
+            var queuedAt = Stopwatch.GetTimestamp();
             return Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
+                var startedAt = Stopwatch.GetTimestamp();
                 SetPipeTimeout(_inPipeId, effectiveTimeoutMs, "read");
                 Array.Clear(buffer, 0, buffer.Length);
 
@@ -248,7 +255,17 @@ namespace ZeroCue.DataProbe.Services
                 unsafe
                 {
                     var ok = WinUsbInterop.WinUsb_ReadPipe(_winUsbHandle, _inPipeId, buffer, ReportLength, out var transferred, null);
+                    // Capture native last-error before any diagnostic work can
+                    // overwrite it. Io includes pipe policy setup and the read.
+                    var readError = ok ? 0 : Marshal.GetLastWin32Error();
                     sw.Stop();
+                    var completedAt = Stopwatch.GetTimestamp();
+                    if (ok && transferred > 0)
+                        Interlocked.Exchange(ref _lastSuccessfulReadTimestamp, completedAt);
+                    _readPerformanceTracker ??= new StageTimingTracker("USB-READ-PERF", "Queue", "Io");
+                    var timingSummary = _readPerformanceTracker.Observe(completedAt,
+                        startedAt - queuedAt, completedAt - startedAt);
+                    if (timingSummary != null) LogTransport($"{timingSummary} pipe=0x{_inPipeId:X2}");
                     if (ok && transferred > 0)
                     {
                         NotifyFrameObserver(buffer, (int)transferred);
@@ -259,7 +276,7 @@ namespace ZeroCue.DataProbe.Services
                         return (true, (int)transferred);
                     }
 
-                    var err = Marshal.GetLastWin32Error();
+                    var err = readError;
                     if (err == WinUsbInterop.ERROR_SEM_TIMEOUT || err == WinUsbInterop.ERROR_OPERATION_ABORTED)
                     {
                         if (_logReadPayloads)

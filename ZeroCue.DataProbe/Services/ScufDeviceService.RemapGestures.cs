@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -44,6 +45,8 @@ namespace ZeroCue.DataProbe.Services
         private readonly Dictionary<string, int> _macroOutputRefs = new Dictionary<string, int>();
         private readonly HashSet<string> _macroFrameTargets = new HashSet<string>();
         private const int XInputMismatchMinimumSamples = 3;
+        private const int XInputVerificationIntervalMs = 50;
+        private long _lastXInputVerificationMs;
         private const int XInputMismatchPersistenceMs = 100;
         private const int XInputMismatchRepeatLogMs = 5000;
         private string _pendingXInputMismatchSignature = string.Empty;
@@ -1285,7 +1288,19 @@ namespace ZeroCue.DataProbe.Services
             _xbox.SetButtonState(Xbox360Button.LeftThumb, _frameTargets.Contains("LeftThumb"));
             _xbox.SetButtonState(Xbox360Button.RightThumb, _frameTargets.Contains("RightThumb"));
             _xbox.SetButtonState(Xbox360Button.Guide, _frameTargets.Contains("Guide"));
+            var submitStarted = Stopwatch.GetTimestamp();
             _xbox.SubmitReport();
+            var submittedAt = Stopwatch.GetTimestamp();
+            if (_outputPerformanceTracker == null || _outputPerformanceMode != ConnectionKind)
+            {
+                _outputPerformanceMode = ConnectionKind;
+                _outputPerformanceTracker = new OutputPerformanceTracker(ConnectionKind.ToString());
+            }
+            ulong digitalState = vigemButtons | ((ulong)leftTriggerOut << 16) | ((ulong)rightTriggerOut << 24);
+            ulong axesState = (ushort)leftStickOut.X | ((ulong)(ushort)leftStickOut.Y << 16) |
+                ((ulong)(ushort)rightStickOut.X << 32) | ((ulong)(ushort)rightStickOut.Y << 48);
+            var outputSummary = _outputPerformanceTracker.Observe(digitalState, axesState, submittedAt, submittedAt - submitStarted);
+            if (outputSummary != null) LogInput(outputSummary);
             VerifyXInputOutput(xinputButtons, vigemButtons, leftTriggerOut, rightTriggerOut);
 
             foreach (var target in _frameTargets)
@@ -1363,6 +1378,15 @@ namespace ZeroCue.DataProbe.Services
                 return;
             }
 
+            // This is a diagnostic read-back, not part of delivering input to games.
+            // Avoid a UserIndex IOCTL and XInputGetState on every controller report.
+            var now = Environment.TickCount64;
+            if (now - _lastXInputVerificationMs < XInputVerificationIntervalMs)
+            {
+                return;
+            }
+            _lastXInputVerificationMs = now;
+
             int userIndex;
             try
             {
@@ -1380,8 +1404,6 @@ namespace ZeroCue.DataProbe.Services
 
             var code = XInputGetState((uint)userIndex, out var state);
             var currentVigemButtons = _xbox.ButtonState;
-            var now = Environment.TickCount64;
-
             if (code != 0)
             {
                 ObserveXInputMismatch(

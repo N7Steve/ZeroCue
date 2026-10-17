@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Channels;
 using LibUsbDotNet;
 using LibUsbDotNet.LibUsb;
 using LibUsbDotNet.Main;
@@ -259,7 +260,23 @@ namespace ZeroCue.DataProbe.Services
                     // Start background thread for polling
                     LogInput("[SYSTEM] Iniciando hilo de captura/polling en segundo plano...");
                     _cts = new CancellationTokenSource();
-                    _pollingTask = Task.Run(() => PollingLoop(_cts.Token));
+                    _outputPerformanceTracker = null;
+                    var inputToken = _cts.Token;
+                    var auxiliaryFrames = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(128)
+                    {
+                        SingleReader = true,
+                        SingleWriter = true,
+                        FullMode = BoundedChannelFullMode.Wait
+                    });
+                    var primaryReader = _reader!;
+                    var auxiliaryReader = _reader2;
+                    // Dedicated workers keep blocking native USB calls off the thread pool.
+                    // Waiting for both prevents native handles being freed while either reads.
+                    _pollingTask = Task.WhenAll(
+                        Task.Factory.StartNew(() => PollingLoop(primaryReader, auxiliaryFrames.Reader, inputToken),
+                            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default),
+                        Task.Factory.StartNew(() => PollAuxiliaryInput(auxiliaryReader, auxiliaryFrames.Writer, inputToken),
+                            CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default));
 
                     IsConnected = true;
                     IsConnecting = false;
@@ -550,72 +567,144 @@ namespace ZeroCue.DataProbe.Services
             _ = Task.Run(Disconnect);
         }
 
-        private void PollingLoop(CancellationToken token)
+        private void PollAuxiliaryInput(UsbEndpointReader? reader, ChannelWriter<byte[]> frames, CancellationToken token)
         {
-            if (_reader == null) return;
-
-            byte[] buf = new byte[DeviceProfile.ReportSize];
-            byte[] last = new byte[FRAME_SIZE];
-            bool baselineCaptured = false;
-
-            byte[] buf2 = new byte[DeviceProfile.ReportSize];
-            byte[] last2 = new byte[FRAME_SIZE];
-byte _swPaddlesState = 0;
-            byte _lastSwPaddlesState = 0;
-            byte _swGKeysState = 0;
-            byte _lastSwGKeysState = 0;
-            last2[0] = 0x11;  // Report ID conocido para G-Keys
-            // last2[1..] ya es 0x00 (estado idle) por defecto del array
-            bool baselineCaptured2 = true;  // No capturar baseline — usar idle conocido
-
-            int consecutiveErrors = 0;
-
-            while (!token.IsCancellationRequested)
+            if (reader == null)
             {
-                if (_modeController != null && _modeController.IsHandshakeActive)
-                {
-                    Thread.Sleep(10);
-                    continue;
-                }
+                frames.TryComplete();
+                return;
+            }
 
-                int xferred = 0;
-                Error err = Error.Success;
-
-                if (UsbLock.Wait(0))
+            var buffer = new byte[DeviceProfile.ReportSize];
+            byte[]? previousGKeys = null;
+            byte[]? previousSoftwareButtons = null;
+            int consecutiveErrors = 0;
+            try
+            {
+                while (!token.IsCancellationRequested)
                 {
+                    Error error;
+                    int length;
+                    // Only this endpoint competes with command ACK readers. Release
+                    // the gate before queueing or processing any controller state.
+                    UsbLock.Wait(token);
                     try
                     {
-                        err = _reader.Read(buf, 150, out xferred);
-                        if (err != Error.Success && err != Error.Io)
-                        {
-                            consecutiveErrors++;
-                            if (consecutiveErrors > 10)
-                            {
-                                LogInput($"[FATAL] Demasiados errores consecutivos ({err}). Desconectando...");
-                                RequestUsbDisconnectFromPolling();
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            consecutiveErrors = 0;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        LogInput($"[FATAL] Excepción durante lectura USB. Mando desconectado? {ex.Message}");
-                        RequestUsbDisconnectFromPolling();
-                        break;
+                        error = reader.Read(buffer, 10, out length);
                     }
                     finally
                     {
                         UsbLock.Release();
                     }
+
+                    if (error == Error.Timeout || (error == Error.Success && length == 0))
+                        continue;
+                    if (error != Error.Success)
+                    {
+                        if (++consecutiveErrors > 10)
+                        {
+                            LogInput($"[FATAL] Auxiliary USB input failed repeatedly ({error}). Disconnecting...");
+                            RequestUsbDisconnectFromPolling();
+                            break;
+                        }
+                        // Back off only on transport failures, never after valid input.
+                        if (token.WaitHandle.WaitOne(5)) break;
+                        continue;
+                    }
+                    consecutiveErrors = 0;
+
+                    // Other reports are ACKs/telemetry, not mapping state. In
+                    // particular trigger telemetry must not fill the digital queue.
+                    if (!((length >= 2 && buffer[0] == 0x11) ||
+                          (length >= 7 && buffer[0] == 0x03 && buffer[2] == 0x02)))
+                        continue;
+                    // Compare mapping state only; changing reserved/telemetry bytes
+                    // must not enqueue duplicate digital transitions.
+                    if ((buffer[0] == 0x11 && previousGKeys != null && buffer[1] == previousGKeys[1]) ||
+                        (buffer[0] == 0x03 && previousSoftwareButtons != null &&
+                         buffer[5] == previousSoftwareButtons[5] && buffer[6] == previousSoftwareButtons[6]))
+                        continue;
+
+                    var frame = buffer.AsSpan(0, length).ToArray();
+                    frames.WriteAsync(frame, token).AsTask().GetAwaiter().GetResult();
+                    if (buffer[0] == 0x11)
+                        previousGKeys = frame;
+                    else
+                        previousSoftwareButtons = frame;
                 }
-                else
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                LogInput($"[FATAL] Auxiliary USB reader failed: {ex.Message}");
+                RequestUsbDisconnectFromPolling();
+            }
+            finally
+            {
+                frames.TryComplete();
+            }
+        }
+
+        private void PollingLoop(UsbEndpointReader reader, ChannelReader<byte[]> auxiliaryFrames, CancellationToken token)
+        {
+            try
+            {
+                PollingLoopCore(reader, auxiliaryFrames, token);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+            catch (Exception ex)
+            {
+                // Stop the companion reader too if parsing/remapping fails.
+                LogInput($"[FATAL] Primary USB input processing failed: {ex.Message}");
+                RequestUsbDisconnectFromPolling();
+            }
+        }
+
+        private void PollingLoopCore(UsbEndpointReader reader, ChannelReader<byte[]> auxiliaryFrames, CancellationToken token)
+        {
+            byte[] buf = new byte[DeviceProfile.ReportSize];
+            byte[] last = new byte[FRAME_SIZE];
+            bool baselineCaptured = false;
+
+            byte[] last2 = new byte[FRAME_SIZE];
+            byte _swPaddlesState = 0;
+            byte _lastSwPaddlesState = 0;
+            byte _swGKeysState = 0;
+            byte _lastSwGKeysState = 0;
+            last2[0] = 0x11;  // Report ID conocido para G-Keys
+            // last2[1..] ya es 0x00 (estado idle) por defecto del array
+
+            int consecutiveErrors = 0;
+
+            while (!token.IsCancellationRequested)
+            {
+                int xferred;
+                Error err;
+                try
                 {
-                    Thread.Sleep(5);
-                    continue;
+                    // IN 0x81 is independent of the control/ACK pipe. Never hold
+                    // UsbLock here: a secondary timeout must not stall stick input.
+                    err = reader.Read(buf, 150, out xferred);
+                    if (err != Error.Success && err != Error.Io)
+                    {
+                        consecutiveErrors++;
+                        if (consecutiveErrors > 10)
+                        {
+                            LogInput($"[FATAL] Demasiados errores consecutivos ({err}). Desconectando...");
+                            RequestUsbDisconnectFromPolling();
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        consecutiveErrors = 0;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogInput($"[FATAL] Excepción durante lectura USB. Mando desconectado? {ex.Message}");
+                    RequestUsbDisconnectFromPolling();
+                    break;
                 }
 
                 if (err != Error.Success || xferred == 0)
@@ -626,101 +715,72 @@ byte _swPaddlesState = 0;
                 // ── Read Endpoint 0x82 (Ep02 - G-Keys) with remap + suppression ──
                 _activeGKeyTargets.Clear();
 
-                if (_reader2 != null)
+                // Consume one state transition per primary report so a queued
+                // press/release pair remains visible in two separate virtual reports.
+                if (auxiliaryFrames.TryRead(out var buf2))
                 {
-                    if (UsbLock.Wait(0))
+                    int len2 = Math.Min(buf2.Length, FRAME_SIZE);
+                    if (!buf2.AsSpan(0, len2).SequenceEqual(last2.AsSpan(0, len2)))
                     {
-                        try
+                        if (buf2[0] == 0x11)
                         {
-                            int xferred2 = 0;
-                            var err2 = _reader2.Read(buf2, 1, out xferred2);
-                            if (err2 == Error.Success && xferred2 > 0)
+                            if (buf2[1] != 0x00)
                             {
-                                int len2 = Math.Min(xferred2, FRAME_SIZE);
-
-                                // Raw telemetry: log every Ep02 read that has changed data
-                                bool changed2 = false;
-                                if (!baselineCaptured2)
+                                // Try to match against known G-Key bitmasks
+                                var mapping = _mapping?.Mappings.FirstOrDefault(m => m.Type == "gkey" && m.BitMask == buf2[1]);
+                                if (mapping != null)
                                 {
-                                    Array.Copy(buf2, last2, len2);
-                                    baselineCaptured2 = true;
+                                    _activeGKeyName = mapping.Name;
+
+                                    if (GKeyRemapTable.TryGetValue(mapping.Name, out var target))
+                                    {
+                                        LastGKeyAction = $"{mapping.Name} → {target}";
+                                        LogInput($"[G-KEY]  [{mapping.Name} pressed (→ {target})] raw=0x{buf2[1]:X2}");
+                                    }
+                                    else
+                                    {
+                                        LastGKeyAction = $"{mapping.Name} pressed";
+                                        LogInput($"[G-KEY]  [{mapping.Name} pressed] raw=0x{buf2[1]:X2}");
+                                    }
                                 }
                                 else
                                 {
-                                    for (int i = 0; i < len2; i++)
-                                    {
-                                        if (buf2[i] != last2[i]) changed2 = true;
-                                    }
-
-                                    if (changed2)
-                                    {
-                                        if (buf2[0] == 0x11)
-                                        {
-                                            if (buf2[1] != 0x00)
-                                            {
-                                                // Try to match against known G-Key bitmasks
-                                                var mapping = _mapping?.Mappings.FirstOrDefault(m => m.Type == "gkey" && m.BitMask == buf2[1]);
-                                                if (mapping != null)
-                                                {
-                                                    _activeGKeyName = mapping.Name;
-
-                                                    if (GKeyRemapTable.TryGetValue(mapping.Name, out var target))
-                                                    {
-                                                        LastGKeyAction = $"{mapping.Name} → {target}";
-                                                        LogInput($"[G-KEY]  [{mapping.Name} pressed (→ {target})] raw=0x{buf2[1]:X2}");
-                                                    }
-                                                    else
-                                                    {
-                                                        LastGKeyAction = $"{mapping.Name} pressed";
-                                                        LogInput($"[G-KEY]  [{mapping.Name} pressed] raw=0x{buf2[1]:X2}");
-                                                    }
-                                                }
-                                                else
-                                                {
-                                                    // UNKNOWN G-Key — bitmask not in our table
-                                                    _activeGKeyName = $"UNKNOWN_0x{buf2[1]:X2}";
-                                                    LastGKeyAction = $"Unknown 0x{buf2[1]:X2}";
-                                                    LogInput($"[G-KEY]  [UNKNOWN G-Key raw=0x{buf2[1]:X2} — no bitmask match, suppressing Guide]");
-                                                    WriteTelemetryInput($"[G-KEY-DIAG] buf2[1]=0x{buf2[1]:X2} does NOT match any configured gkey. Table: {string.Join(" ", _mapping?.Mappings.Where(m => m.Type == "gkey").Select(m => $"{m.Name}=0x{m.BitMask:X2}") ?? Array.Empty<string>())}");
-                                                }
-                                            }
-                                            else
-                                            {
-                                                // G-Key released — only log if we had an active Ep02 G-Key
-                                                if (_activeGKeyName != null)
-                                                {
-                                                    string releasedName = _activeGKeyName;
-                                                    _activeGKeyName = null;
-                                                    LastGKeyAction = $"{releasedName} released";
-                                                    LogInput($"[G-KEY]  [{releasedName} released]");
-                                                }
-                                                else
-                                                {
-                                                    WriteTelemetryComm($"[EP02-IDLE] buf2[1]=0x00 (baseline settle — ignored)");
-                                                }
-                                            }
-                                        }
-                                        else if (buf2[0] == 0x03 && buf2[2] == 0x02)
-                                        {
-                                            _swPaddlesState = buf2[5];
-                                            _swGKeysState = buf2[6];
-                                            WriteTelemetryInput($"[EP02-SW-BTNS] Paddles=0x{_swPaddlesState:X2} GKeys=0x{_swGKeysState:X2}");
-                                        }
-                                        else
-                                        {
-                                            // Non-0x11 report from Ep02 — log for diagnostics
-                                            WriteTelemetryComm($"[EP02-OTHER] reportId=0x{buf2[0]:X2} data={HexDump(buf2, len2)}");
-                                        }
-
-                                        Array.Copy(buf2, last2, len2);
-                                    }
+                                    // UNKNOWN G-Key — bitmask not in our table
+                                    _activeGKeyName = $"UNKNOWN_0x{buf2[1]:X2}";
+                                    LastGKeyAction = $"Unknown 0x{buf2[1]:X2}";
+                                    LogInput($"[G-KEY]  [UNKNOWN G-Key raw=0x{buf2[1]:X2} — no bitmask match, suppressing Guide]");
+                                    WriteTelemetryInput($"[G-KEY-DIAG] buf2[1]=0x{buf2[1]:X2} does NOT match any configured gkey. Table: {string.Join(" ", _mapping?.Mappings.Where(m => m.Type == "gkey").Select(m => $"{m.Name}=0x{m.BitMask:X2}") ?? Array.Empty<string>())}");
+                                }
+                            }
+                            else
+                            {
+                                // G-Key released — only log if we had an active Ep02 G-Key
+                                if (_activeGKeyName != null)
+                                {
+                                    string releasedName = _activeGKeyName;
+                                    _activeGKeyName = null;
+                                    LastGKeyAction = $"{releasedName} released";
+                                    LogInput($"[G-KEY]  [{releasedName} released]");
+                                }
+                                else
+                                {
+                                    WriteTelemetryComm($"[EP02-IDLE] buf2[1]=0x00 (baseline settle — ignored)");
                                 }
                             }
                         }
-                        finally
+                        else if (buf2[0] == 0x03 && buf2[2] == 0x02)
                         {
-                            UsbLock.Release();
+                            _swPaddlesState = buf2[5];
+                            _swGKeysState = buf2[6];
+                            WriteTelemetryInput($"[EP02-SW-BTNS] Paddles=0x{_swPaddlesState:X2} GKeys=0x{_swGKeysState:X2}");
                         }
+                        else
+                        {
+                            // Non-0x11 report from Ep02 — log for diagnostics
+                            WriteTelemetryComm($"[EP02-OTHER] reportId=0x{buf2[0]:X2} data={HexDump(buf2, len2)}");
+                        }
+
+                        Array.Copy(buf2, last2, len2);
                     }
                 }
 
@@ -730,14 +790,6 @@ byte _swPaddlesState = 0;
                 {
                     _activeGKeyTargets.Add(_activeGKeyName);
                 }
-
-                if (err == Error.Timeout) continue;
-                if (err != Error.Success)
-                {
-                    Thread.Sleep(10);
-                    continue;
-                }
-                if (xferred == 0) continue;
 
                 int len = Math.Min(xferred, FRAME_SIZE);
                 if (!baselineCaptured)

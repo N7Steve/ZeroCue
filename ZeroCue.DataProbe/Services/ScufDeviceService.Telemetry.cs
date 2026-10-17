@@ -28,6 +28,19 @@ namespace ZeroCue.DataProbe.Services
             byte lt, byte rt,
             short lx, short ly, short rx, short ry)
         {
+            // Most reports only move analog axes. Avoid allocating a diagnostic
+            // change list when none of the tracked digital buttons changed.
+            if (a == _vigemTracker.A && b == _vigemTracker.B &&
+                x == _vigemTracker.X && y == _vigemTracker.Y &&
+                lb == _vigemTracker.LB && rb == _vigemTracker.RB &&
+                back == _vigemTracker.Back && start == _vigemTracker.Start &&
+                up == _vigemTracker.Up && down == _vigemTracker.Down &&
+                left == _vigemTracker.Left && right == _vigemTracker.Right &&
+                l3 == _vigemTracker.L3 && r3 == _vigemTracker.R3 && guide == _vigemTracker.Guide)
+            {
+                return;
+            }
+
             var changes = new List<string>();
 
             if (a != _vigemTracker.A) { _vigemTracker.A = a; changes.Add($"A={(a ? "1" : "0")}"); }

@@ -41,7 +41,6 @@ namespace ZeroCue.DataProbe.Services
         public Action? ControllerActivityObserver { get; init; }
         public bool EnableFileLogging { get; init; } = true;
         public bool EnableProtocolTrace { get; init; }
-        public int RadioPumpReadDelayMs { get; init; }
     }
 
     public sealed class WirelessWinUsbAggressiveSessionProbe
@@ -447,14 +446,14 @@ namespace ZeroCue.DataProbe.Services
         private async Task RunRadioMi03PumpAsync(WirelessDongleWinUsbTransport radioTransport, CancellationToken ct, bool enableLogging)
         {
             var buffer = new byte[64];
+            var pumpTiming = new StageTimingTracker("RADIO-PUMP-PERF", "Continuation", "Observer");
             var sw = Stopwatch.StartNew();
             var lastLogMs = 0L;
             var readCount = 0;
             var timeoutCount = 0;
-            var readDelayMs = Math.Max(0, _options.RadioPumpReadDelayMs);
             using var inputMapLogger = new WirelessWinUsbInputMapLogger(Log, enableLogging);
 
-            Log($"Auxiliary radio input pump start: draining IN 0x81 frames while runtime control uses OUT 0x02 / IN 0x82. readDelayMs={readDelayMs}");
+            Log("Auxiliary radio input pump start: continuously reading IN 0x81 while runtime control uses OUT 0x02 / IN 0x82.");
             while (!ct.IsCancellationRequested && radioTransport.IsOpen)
             {
                 try
@@ -462,15 +461,18 @@ namespace ZeroCue.DataProbe.Services
                     var (success, bytesRead) = await radioTransport.ReadReportAsync(buffer, 250, ct);
                     if (success && bytesRead > 0)
                     {
+                        var continuationStarted = Stopwatch.GetTimestamp();
                         readCount++;
                         inputMapLogger.ObserveFrame(buffer, bytesRead);
                         var observedFrame = CopyFrame(buffer, bytesRead);
                         _options.ControllerActivityObserver?.Invoke();
                         _options.RadioInputFrameObserver?.Invoke(observedFrame, observedFrame.Length);
-                        if (readDelayMs > 0)
-                        {
-                            await Task.Delay(readDelayMs, ct);
-                        }
+                        var observerCompleted = Stopwatch.GetTimestamp();
+                        var readCompleted = radioTransport.LastSuccessfulReadTimestamp;
+                        var summary = pumpTiming.Observe(observerCompleted,
+                            readCompleted == 0 ? 0 : continuationStarted - readCompleted,
+                            observerCompleted - continuationStarted);
+                        if (summary != null) Log(summary);
                     }
                     else
                     {
@@ -664,7 +666,8 @@ namespace ZeroCue.DataProbe.Services
                     Trace($"ACK ignored frame count={ignoredFrames} firstByte=0x{ack[0]:X2} while waiting channel=0x{expectedAckChannel:X2} opcode=0x{expectedOpcode:X2}");
                 }
 
-                await Task.Delay(1, ct);
+                // A completed USB read already paces this loop. Keep draining input
+                // immediately while waiting for the matching ACK on the shared pipe.
             }
 
             throw new TimeoutException($"WirelessAckTimeout channel=0x{expectedAckChannel:X2} opcode=0x{expectedOpcode:X2}");

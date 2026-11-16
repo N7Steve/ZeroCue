@@ -148,7 +148,10 @@ namespace ZeroCue.DataProbe.Services
                 catch (Exception ex)
                 {
                     IsViGEmActive = false;
-                    LogInput($"[VIGEM] WARN wireless WinUSB: {ex.Message}. Se mantiene control/configuracion WinUSB.");
+                    _xbox = null;
+                    try { _client?.Dispose(); } catch { }
+                    _client = null;
+                    LogInput($"[VIGEM] WARN wireless WinUSB: {ex.Message}. Keeping WinUSB control/configuration and keyboard/mouse mappings.");
                 }
 
                 IsConnected = true;

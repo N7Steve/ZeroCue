@@ -9,11 +9,73 @@ namespace ZeroCue.DataProbe.Services
         private const int AckWaitTimeoutMs = 1500;
         private const int AckReadTimeoutMs = 90;
 
-        private readonly IScufRawTransport _transport;
+        private const int StaleDrainReadTimeoutMs = 2;
+        private const int MaxStaleFramesPerCommand = 8;
 
-        public ScufAckReader(IScufRawTransport transport)
+        private readonly IScufRawTransport _transport;
+        private readonly Action<byte[], int>? _nonAckFrameObserver;
+
+        /// <param name="nonAckFrameObserver">
+        /// Receives frames read while waiting for an ACK that are not ACKs. On the wired
+        /// Ep82 pipe these are G-key and software-paddle input; dropping them lost
+        /// releases and left mapped outputs held.
+        /// </param>
+        public ScufAckReader(IScufRawTransport transport, Action<byte[], int>? nonAckFrameObserver = null)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
+            _nonAckFrameObserver = nonAckFrameObserver;
+        }
+
+        /// <summary>
+        /// Discards ACKs left over from earlier timed-out commands so they cannot be
+        /// matched to the next command with the same opcode (which shifted every
+        /// following response by one).
+        /// </summary>
+        private async Task DrainStaleFramesAsync(byte[] buffer, CancellationToken ct)
+        {
+            int staleAcks = 0;
+            for (int i = 0; i < MaxStaleFramesPerCommand; i++)
+            {
+                var (success, bytesRead) = await _transport.ReadReportAsync(buffer, StaleDrainReadTimeoutMs, ct);
+                if (!success)
+                {
+                    break;
+                }
+
+                if (bytesRead >= 4 && buffer[0] == 0x01)
+                {
+                    staleAcks++;
+                }
+                else
+                {
+                    ForwardNonAck(buffer, bytesRead);
+                }
+            }
+
+            if (staleAcks > 0)
+            {
+                _transport.LogTransport($"Discarded {staleAcks} stale ACK frame(s) before sending.");
+            }
+        }
+
+        private void ForwardNonAck(byte[] buffer, int bytesRead)
+        {
+            var observer = _nonAckFrameObserver;
+            if (observer == null || bytesRead <= 0)
+            {
+                return;
+            }
+
+            try
+            {
+                var frame = new byte[bytesRead];
+                Buffer.BlockCopy(buffer, 0, frame, 0, bytesRead);
+                observer(frame, bytesRead);
+            }
+            catch (Exception ex)
+            {
+                _transport.LogTransport($"Non-ACK frame observer failed: {ex.Message}");
+            }
         }
 
         public async Task SendCommandAndCheckStatusAsync(byte[] report, byte expectedOpcode, CancellationToken ct, bool strictStatus = true)
@@ -35,9 +97,9 @@ namespace ZeroCue.DataProbe.Services
             _transport.LogTransport($"--- ENVIANDO COMANDO (AckChannel Esperado: 0x{expectedAckChannel:X2}, Opcode Esperado: 0x{expectedOpcode:X2}) ---");
             _transport.LogTransport($"OUT [Ep02] Req: 64 bytes | Payload: {BitConverter.ToString(report).Replace("-", " ")}");
 
-            await _transport.WriteReportAsync(report, ct);
-
             var readBuffer = new byte[64];
+            await DrainStaleFramesAsync(readBuffer, ct);
+            await _transport.WriteReportAsync(report, ct);
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(AckWaitTimeoutMs);
@@ -77,23 +139,31 @@ namespace ZeroCue.DataProbe.Services
                         }
 
                         ignoredFrames++;
+                        if (readBuffer[0] != 0x01)
+                        {
+                            ForwardNonAck(readBuffer, bytesRead);
+                        }
+
                         if (ignoredFrames <= 3 || ignoredFrames % 25 == 0)
                         {
                             _transport.LogTransport($"ACK ignorado count={ignoredFrames} firstByte=0x{readBuffer[0]:X2} esperando canal=0x{expectedAckChannel:X2} opcode=0x{expectedOpcode:X2}");
                         }
-
-                        await Task.Delay(1, ct);
                     }
                 }
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // Caller cancellation (disconnect/shutdown) is not a protocol failure.
+                throw;
+            }
             catch (OperationCanceledException)
             {
-                _transport.LogTransport($"TIMEOUT o Cancelación esperando ACK para Opcode 0x{expectedOpcode:X2}");
-                throw new Exception($"Timeout esperando ACK para Opcode 0x{expectedOpcode:X2}");
+                _transport.LogTransport($"TIMEOUT esperando ACK para Opcode 0x{expectedOpcode:X2}");
+                throw new TimeoutException($"Timeout esperando ACK para Opcode 0x{expectedOpcode:X2}");
             }
 
             _transport.LogTransport($"TIMEOUT esperando ACK para Opcode 0x{expectedOpcode:X2}");
-            throw new Exception($"Timeout esperando ACK para Opcode 0x{expectedOpcode:X2}");
+            throw new TimeoutException($"Timeout esperando ACK para Opcode 0x{expectedOpcode:X2}");
         }
 
         private static bool IsAckFor(byte[] buffer, byte expectedAckChannel, byte expectedOpcode)

@@ -62,6 +62,10 @@ namespace ZeroCue.DataProbe.Services
         [DllImport("winusb.dll", SetLastError = true)]
         public static extern bool WinUsb_ResetPipe(IntPtr InterfaceHandle, byte PipeID);
 
+        /// <summary>Cancels pending transfers on a pipe so blocked reads/writes return immediately.</summary>
+        [DllImport("winusb.dll", SetLastError = true)]
+        public static extern bool WinUsb_AbortPipe(IntPtr InterfaceHandle, byte PipeID);
+
         [DllImport("winusb.dll", SetLastError = true)]
         public static extern unsafe bool WinUsb_GetOverlappedResult(IntPtr InterfaceHandle, NativeOverlapped* Overlapped, out uint NumberOfBytesTransferred, bool Wait);
 

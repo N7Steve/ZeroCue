@@ -22,6 +22,8 @@ namespace ZeroCue.DataProbe.Services
         private const int ReportLength = 64;
         private const int DefaultWriteTimeoutMs = 750;
         private const int DefaultReadTimeoutMs = 1000;
+        private const int MaxConsecutiveWriteFailures = 3;
+        private const int MaxConsecutiveReadGenFailures = 20;
 
         private static readonly SupportedScufDeviceProfile DeviceProfile = SupportedScufDeviceProfile.ScufEnvisionPro;
         private readonly Action<string> _logger;
@@ -38,6 +40,17 @@ namespace ZeroCue.DataProbe.Services
         private StageTimingTracker? _readPerformanceTracker;
         private long _lastSuccessfulReadTimestamp;
         internal long LastSuccessfulReadTimestamp => Interlocked.Read(ref _lastSuccessfulReadTimestamp);
+
+        // Handle lifetime: every native call holds an I/O reference; closing aborts the
+        // pipes and waits for in-flight calls before WinUsb_Free, so a reader can
+        // never run on a freed or recycled handle.
+        private readonly object _lifetimeGate = new();
+        private int _activeIo;
+        private bool _closing;
+        private int _inPipeTimeoutMs = -1;
+        private int _outPipeTimeoutMs = -1;
+        private int _consecutiveWriteFailures;
+        private int _consecutiveReadGenFailures;
 
         public WirelessDongleWinUsbTransport(
             Action<string> logger,
@@ -188,7 +201,21 @@ namespace ZeroCue.DataProbe.Services
             return Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
-                SetPipeTimeout(_outPipeId, DefaultWriteTimeoutMs, "write");
+                var winUsbHandle = BeginIo();
+                try
+                {
+                    WriteCore(winUsbHandle, report);
+                }
+                finally
+                {
+                    EndIo();
+                }
+            }, ct);
+        }
+
+        private void WriteCore(IntPtr winUsbHandle, byte[] report)
+        {
+                SetPipeTimeoutCached(winUsbHandle, _outPipeId, DefaultWriteTimeoutMs, ref _outPipeTimeoutMs, "write");
 
                 if (!_firstWriteLogged)
                 {
@@ -200,33 +227,41 @@ namespace ZeroCue.DataProbe.Services
                 var sw = Stopwatch.StartNew();
                 unsafe
                 {
-                    var ok = WinUsbInterop.WinUsb_WritePipe(_winUsbHandle, _outPipeId, report, ReportLength, out var transferred, null);
+                    var ok = WinUsbInterop.WinUsb_WritePipe(winUsbHandle, _outPipeId, report, ReportLength, out var transferred, null);
+                    var err = ok ? 0 : Marshal.GetLastWin32Error();
                     sw.Stop();
                     if (!ok)
                     {
-                        var err = Marshal.GetLastWin32Error();
-                        if (err == WinUsbInterop.ERROR_SEM_TIMEOUT || err == WinUsbInterop.ERROR_OPERATION_ABORTED)
+                        if (Volatile.Read(ref _closing))
                         {
-                            LogTransport($"WRITE WinUSB TIMEOUT/ABORT pipe=0x{_outPipeId:X2} durationMs={sw.ElapsedMilliseconds} win32={err}");
+                            throw new OperationCanceledException("Wireless WinUSB transport is closing.");
+                        }
+
+                        if (err == WinUsbInterop.ERROR_SEM_TIMEOUT || err == WinUsbInterop.ERROR_OPERATION_ABORTED || err == WinUsbInterop.ERROR_GEN_FAILURE)
+                        {
+                            // Isolated failures happen while the receiver changes state and are
+                            // tolerated, but repeated ones mean the packet path is gone: report
+                            // it instead of pretending the write succeeded.
+                            var failures = Interlocked.Increment(ref _consecutiveWriteFailures);
+                            LogTransport($"WRITE WinUSB {(err == WinUsbInterop.ERROR_GEN_FAILURE ? "ERROR_GEN_FAILURE" : "TIMEOUT/ABORT")} pipe=0x{_outPipeId:X2} durationMs={sw.ElapsedMilliseconds} win32={err} consecutive={failures}");
+                            if (failures >= MaxConsecutiveWriteFailures)
+                            {
+                                throw new IOException($"WinUsb_WritePipe failed {failures} consecutive times (last win32={err}); the receiver is not accepting packets.");
+                            }
+
                             return;
                         }
 
-                        if (err == WinUsbInterop.ERROR_GEN_FAILURE)
-                        {
-                            LogTransport($"WRITE WinUSB ERROR_GEN_FAILURE pipe=0x{_outPipeId:X2} durationMs={sw.ElapsedMilliseconds}. Treating as recoverable without resetting OUT pipe.");
-                            Thread.Sleep(5);
-                            return;
-                        }
                         LogTransport($"WRITE WinUSB FAIL pipe=0x{_outPipeId:X2} durationMs={sw.ElapsedMilliseconds} win32={err} {new System.ComponentModel.Win32Exception(err).Message}");
                         throw new IOException($"WinUsb_WritePipe failed win32={err} {new System.ComponentModel.Win32Exception(err).Message}");
                     }
 
+                    Interlocked.Exchange(ref _consecutiveWriteFailures, 0);
                     if (_logReadPayloads)
                     {
                         LogTransport($"WRITE WinUSB OK pipe=0x{_outPipeId:X2} bytes={transferred} durationMs={sw.ElapsedMilliseconds} payload={ScufReportBuilder.ToHex(report)}");
                     }
                 }
-            }, ct);
         }
 
         public Task<(bool Success, int BytesRead)> ReadReportAsync(byte[] buffer, int timeoutMs, CancellationToken ct)
@@ -247,14 +282,28 @@ namespace ZeroCue.DataProbe.Services
             return Task.Run(() =>
             {
                 ct.ThrowIfCancellationRequested();
+                var winUsbHandle = BeginIo();
+                try
+                {
+                    return ReadCore(winUsbHandle, buffer, effectiveTimeoutMs, queuedAt);
+                }
+                finally
+                {
+                    EndIo();
+                }
+            }, ct);
+        }
+
+        private (bool Success, int BytesRead) ReadCore(IntPtr winUsbHandle, byte[] buffer, int effectiveTimeoutMs, long queuedAt)
+        {
                 var startedAt = Stopwatch.GetTimestamp();
-                SetPipeTimeout(_inPipeId, effectiveTimeoutMs, "read");
+                SetPipeTimeoutCached(winUsbHandle, _inPipeId, effectiveTimeoutMs, ref _inPipeTimeoutMs, "read");
                 Array.Clear(buffer, 0, buffer.Length);
 
                 var sw = Stopwatch.StartNew();
                 unsafe
                 {
-                    var ok = WinUsbInterop.WinUsb_ReadPipe(_winUsbHandle, _inPipeId, buffer, ReportLength, out var transferred, null);
+                    var ok = WinUsbInterop.WinUsb_ReadPipe(winUsbHandle, _inPipeId, buffer, ReportLength, out var transferred, null);
                     // Capture native last-error before any diagnostic work can
                     // overwrite it. Io includes pipe policy setup and the read.
                     var readError = ok ? 0 : Marshal.GetLastWin32Error();
@@ -268,6 +317,7 @@ namespace ZeroCue.DataProbe.Services
                     if (timingSummary != null) LogTransport($"{timingSummary} pipe=0x{_inPipeId:X2}");
                     if (ok && transferred > 0)
                     {
+                        Interlocked.Exchange(ref _consecutiveReadGenFailures, 0);
                         NotifyFrameObserver(buffer, (int)transferred);
                         if (_logReadPayloads)
                         {
@@ -277,8 +327,14 @@ namespace ZeroCue.DataProbe.Services
                     }
 
                     var err = readError;
-                    if (err == WinUsbInterop.ERROR_SEM_TIMEOUT || err == WinUsbInterop.ERROR_OPERATION_ABORTED)
+                    if (Volatile.Read(ref _closing))
                     {
+                        throw new OperationCanceledException("Wireless WinUSB transport is closing.");
+                    }
+
+                    if (ok || err == WinUsbInterop.ERROR_SEM_TIMEOUT || err == WinUsbInterop.ERROR_OPERATION_ABORTED)
+                    {
+                        Interlocked.Exchange(ref _consecutiveReadGenFailures, 0);
                         if (_logReadPayloads)
                         {
                             LogTransport($"READ WinUSB TIMEOUT pipe=0x{_inPipeId:X2} timeoutMs={effectiveTimeoutMs} durationMs={sw.ElapsedMilliseconds} win32={err}");
@@ -288,7 +344,19 @@ namespace ZeroCue.DataProbe.Services
 
                     if (err == WinUsbInterop.ERROR_GEN_FAILURE)
                     {
-                        LogTransport($"READ WinUSB ERROR_GEN_FAILURE pipe=0x{_inPipeId:X2} durationMs={sw.ElapsedMilliseconds}. Treating as transient without resetting the shared device pipe.");
+                        // Transient while the receiver re-enumerates, but a removed device
+                        // returns it forever: give up so the session can be torn down.
+                        var failures = Interlocked.Increment(ref _consecutiveReadGenFailures);
+                        if (failures >= MaxConsecutiveReadGenFailures)
+                        {
+                            throw new IOException($"WinUsb_ReadPipe returned ERROR_GEN_FAILURE {failures} consecutive times; the receiver is gone.");
+                        }
+
+                        if (failures == 1 || failures % 5 == 0)
+                        {
+                            LogTransport($"READ WinUSB ERROR_GEN_FAILURE pipe=0x{_inPipeId:X2} durationMs={sw.ElapsedMilliseconds} consecutive={failures}.");
+                        }
+
                         Thread.Sleep(5);
                         return (false, 0);
                     }
@@ -296,7 +364,32 @@ namespace ZeroCue.DataProbe.Services
                     LogTransport($"READ WinUSB FAIL pipe=0x{_inPipeId:X2} durationMs={sw.ElapsedMilliseconds} win32={err} {new System.ComponentModel.Win32Exception(err).Message}");
                     throw new IOException($"WinUsb_ReadPipe failed win32={err} {new System.ComponentModel.Win32Exception(err).Message}");
                 }
-            }, ct);
+        }
+
+        private IntPtr BeginIo()
+        {
+            lock (_lifetimeGate)
+            {
+                if (_closing || !IsOpen)
+                {
+                    throw new InvalidOperationException("Wireless WinUSB transport is not open.");
+                }
+
+                _activeIo++;
+                return _winUsbHandle;
+            }
+        }
+
+        private void EndIo()
+        {
+            lock (_lifetimeGate)
+            {
+                _activeIo--;
+                if (_activeIo == 0)
+                {
+                    Monitor.PulseAll(_lifetimeGate);
+                }
+            }
         }
 
         public async Task DrainAsync()
@@ -452,14 +545,12 @@ namespace ZeroCue.DataProbe.Services
             return true;
         }
 
+        /// <summary>Applies the per-pipe timeout and AUTO_CLEAR_STALL once when the pipe is opened.</summary>
         private void SetPipeTimeout(byte pipeId, int timeoutMs, string direction)
         {
-            var value = (uint)Math.Clamp(timeoutMs, 1, 30_000);
-            if (!WinUsbInterop.WinUsb_SetPipePolicy(_winUsbHandle, pipeId, WinUsbInterop.PIPE_TRANSFER_TIMEOUT, sizeof(uint), ref value))
-            {
-                var err = Marshal.GetLastWin32Error();
-                LogTransport($"WinUsb_SetPipePolicy {direction} timeout failed pipe=0x{pipeId:X2} timeoutMs={timeoutMs} win32={err} {new System.ComponentModel.Win32Exception(err).Message}");
-            }
+            ref int cached = ref (pipeId == _inPipeId ? ref _inPipeTimeoutMs : ref _outPipeTimeoutMs);
+            cached = -1;
+            SetPipeTimeoutCached(_winUsbHandle, pipeId, timeoutMs, ref cached, direction);
 
             uint autoClearStall = 1;
             if (!WinUsbInterop.WinUsb_SetPipePolicy(_winUsbHandle, pipeId, WinUsbInterop.AUTO_CLEAR_STALL, sizeof(uint), ref autoClearStall))
@@ -469,16 +560,89 @@ namespace ZeroCue.DataProbe.Services
             }
         }
 
-        private void DisposeHandles()
+        /// <summary>
+        /// Changes the transfer timeout only when it differs from the current one;
+        /// a policy IOCTL per packet added measurable latency at 250-1000 Hz.
+        /// </summary>
+        private void SetPipeTimeoutCached(IntPtr winUsbHandle, byte pipeId, int timeoutMs, ref int cachedTimeoutMs, string direction)
         {
-            if (_winUsbHandle != IntPtr.Zero)
+            var clamped = Math.Clamp(timeoutMs, 1, 30_000);
+            if (Volatile.Read(ref cachedTimeoutMs) == clamped)
             {
-                try { WinUsbInterop.WinUsb_Free(_winUsbHandle); } catch { }
-                _winUsbHandle = IntPtr.Zero;
+                return;
             }
 
-            _deviceHandle?.Dispose();
-            _deviceHandle = null;
+            var value = (uint)clamped;
+            if (!WinUsbInterop.WinUsb_SetPipePolicy(winUsbHandle, pipeId, WinUsbInterop.PIPE_TRANSFER_TIMEOUT, sizeof(uint), ref value))
+            {
+                var err = Marshal.GetLastWin32Error();
+                LogTransport($"WinUsb_SetPipePolicy {direction} timeout failed pipe=0x{pipeId:X2} timeoutMs={timeoutMs} win32={err} {new System.ComponentModel.Win32Exception(err).Message}");
+                Volatile.Write(ref cachedTimeoutMs, -1);
+                return;
+            }
+
+            Volatile.Write(ref cachedTimeoutMs, clamped);
+        }
+
+        private void DisposeHandles()
+        {
+            lock (_lifetimeGate)
+            {
+                _closing = true;
+            }
+
+            try
+            {
+                if (_winUsbHandle != IntPtr.Zero)
+                {
+                    // Unblock in-flight transfers, then wait for them before freeing.
+                    try { WinUsbInterop.WinUsb_AbortPipe(_winUsbHandle, _inPipeId); } catch { }
+                    if (_outPipeId != 0x00)
+                    {
+                        try { WinUsbInterop.WinUsb_AbortPipe(_winUsbHandle, _outPipeId); } catch { }
+                    }
+
+                    bool idle;
+                    lock (_lifetimeGate)
+                    {
+                        var deadline = Environment.TickCount64 + 2000;
+                        while (_activeIo > 0 && Environment.TickCount64 < deadline)
+                        {
+                            Monitor.Wait(_lifetimeGate, 100);
+                        }
+
+                        idle = _activeIo == 0;
+                    }
+
+                    if (idle)
+                    {
+                        try { WinUsbInterop.WinUsb_Free(_winUsbHandle); } catch { }
+                    }
+                    else
+                    {
+                        // Leaking one handle is recoverable; freeing it under a running
+                        // native call is an access violation.
+                        LogTransport("WinUSB I/O still in flight after abort; leaving the interface handle unfreed.");
+                    }
+
+                    _winUsbHandle = IntPtr.Zero;
+                }
+
+                _deviceHandle?.Dispose();
+                _deviceHandle = null;
+            }
+            finally
+            {
+                lock (_lifetimeGate)
+                {
+                    _closing = false;
+                }
+            }
+
+            _inPipeTimeoutMs = -1;
+            _outPipeTimeoutMs = -1;
+            Interlocked.Exchange(ref _consecutiveWriteFailures, 0);
+            Interlocked.Exchange(ref _consecutiveReadGenFailures, 0);
             DevicePath = null;
             SelectedReceiverIdentity = null;
             Pipes = Array.Empty<WinUsbPipeDescriptor>();

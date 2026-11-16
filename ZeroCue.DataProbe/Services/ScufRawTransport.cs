@@ -32,32 +32,34 @@ namespace ZeroCue.DataProbe.Services
             _logger = logger;
         }
 
+        // libusb transfers are synchronous. Callers await these methods from the UI
+        // thread (RGB, brightness, rumble settings), so the blocking part always runs
+        // on the thread pool instead of freezing the window for up to a second.
         public Task WriteReportAsync(byte[] report, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
-            var result = _writerEp02.Write(report, 1000, out int transferred);
-            if (result == Error.Success)
+            return Task.Run(() =>
             {
-                LogTransport($"WRITE OK Ep02 bytesWritten={transferred}");
-            }
-            else
-            {
+                var result = _writerEp02.Write(report, 1000, out int transferred);
+                if (result == Error.Success)
+                {
+                    LogTransport($"WRITE OK Ep02 bytesWritten={transferred}");
+                    return;
+                }
+
                 LogTransport($"WRITE FAIL Ep02 error={result}");
-                throw new Exception($"libusb_interrupt_transfer falló con código: {result}");
-            }
-            return Task.CompletedTask;
+                throw new System.IO.IOException($"libusb interrupt transfer failed: {result}");
+            }, ct);
         }
 
-        public async Task<(bool Success, int BytesRead)> ReadReportAsync(byte[] buffer, int timeoutMs, CancellationToken ct)
+        public Task<(bool Success, int BytesRead)> ReadReportAsync(byte[] buffer, int timeoutMs, CancellationToken ct)
         {
-            var err = _readerEp82.Read(buffer, timeoutMs, out int bytesRead);
-            if (err == Error.Success && bytesRead > 0)
+            ct.ThrowIfCancellationRequested();
+            return Task.Run(() =>
             {
-                return (true, bytesRead);
-            }
-            // Pequeño delay asíncrono para no bloquear en caso de loop
-            await Task.Delay(1, ct);
-            return (false, 0);
+                var err = _readerEp82.Read(buffer, timeoutMs, out int bytesRead);
+                return err == Error.Success && bytesRead > 0 ? (true, bytesRead) : (false, 0);
+            }, ct);
         }
 
         public async Task DrainAsync()

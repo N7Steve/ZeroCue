@@ -16,6 +16,7 @@ using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
 using ZeroCue.DataProbe.Models;
+using ZeroCue.DataProbe.Services.Pnp;
 
 
 namespace ZeroCue.DataProbe.Services
@@ -24,6 +25,12 @@ namespace ZeroCue.DataProbe.Services
     {
 
         private Task? _autoConnectTask;
+        private DevicePresenceMonitor? _presenceMonitor;
+        private readonly SemaphoreSlim _presenceSignal = new(0, 1);
+        private string? _lastPresenceSignature;
+
+        /// <summary>Most recent device presence snapshot (drivers, problem codes).</summary>
+        public ScufPresenceSnapshot LastPresence { get; private set; } = ScufPresenceSnapshot.Empty;
         private readonly SemaphoreSlim _connectionAttemptGate = new(1, 1);
         private int _connectionSuspensionCount;
         private long _nextWirelessAutoProbeTimestamp;
@@ -32,17 +39,16 @@ namespace ZeroCue.DataProbe.Services
         public async Task<IDisposable> SuspendConnectionsAsync()
         {
             Interlocked.Increment(ref _connectionSuspensionCount);
-            Disconnect();
+            // Never tear down handles that a connection attempt is still using: ask the
+            // attempt to stop, wait until it has released the gate, then disconnect.
+            CancelInFlightConnectionAttempt();
             bool gateAcquired = false;
 
             try
             {
                 await _connectionAttemptGate.WaitAsync();
                 gateAcquired = true;
-                if (IsConnected || IsConnecting)
-                {
-                    Disconnect();
-                }
+                Disconnect();
                 LogInput("[SYSTEM] Controller connections suspended for driver maintenance.");
                 return new ConnectionSuspension(this);
             }
@@ -67,14 +73,129 @@ namespace ZeroCue.DataProbe.Services
 
         private async Task AutoConnectionLoop()
         {
+            try
+            {
+                _presenceMonitor = new DevicePresenceMonitor();
+                _presenceMonitor.Changed += OnDevicePresenceChanged;
+                LogInput($"[DETECT] Hot-plug notifications {(_presenceMonitor.IsActive ? "enabled" : "unavailable; using periodic detection")}.");
+            }
+            catch (Exception ex)
+            {
+                LogInput($"[DETECT] Hot-plug notifications unavailable: {ex.Message}");
+            }
+
             while (true)
             {
-                if (Volatile.Read(ref _connectionSuspensionCount) == 0 && !IsConnected)
+                try
                 {
-                    await ConnectAsync(autoConnect: true);
+                    if (Volatile.Read(ref _connectionSuspensionCount) == 0 && !IsConnected && !IsConnecting)
+                    {
+                        var presence = RefreshPresence();
+                        if (presence.IsWiredReady || presence.IsReceiverReady)
+                        {
+                            await ConnectAsync(autoConnect: true);
+                        }
+                        else
+                        {
+                            ApplyPresenceStatus(presence);
+                        }
+                    }
                 }
-                await Task.Delay(2000);
+                catch (Exception ex)
+                {
+                    LogInput($"[SYSTEM] Auto-connect iteration failed: {ex.Message}");
+                }
+
+                // Hot-plug events wake the loop immediately; the timeout is only a fallback.
+                await WaitForPresenceChangeAsync(IsConnected ? TimeSpan.FromSeconds(10) : TimeSpan.FromSeconds(2));
             }
+        }
+
+        private void OnDevicePresenceChanged()
+        {
+            // A new arrival (cable, receiver, or the receiver switching PID when the
+            // controller turns on) deserves an immediate attempt, not the backoff.
+            Interlocked.Exchange(ref _nextWirelessAutoProbeTimestamp, 0);
+            Interlocked.Exchange(ref _wirelessAutoProbeFailureCount, 0);
+            try
+            {
+                if (_presenceSignal.CurrentCount == 0)
+                {
+                    _presenceSignal.Release();
+                }
+            }
+            catch (SemaphoreFullException)
+            {
+            }
+        }
+
+        private async Task WaitForPresenceChangeAsync(TimeSpan timeout)
+        {
+            await _presenceSignal.WaitAsync(timeout);
+        }
+
+        /// <summary>Captures which SCUF devices are present and logs the snapshot when it changes.</summary>
+        private ScufPresenceSnapshot RefreshPresence()
+        {
+            var presence = ScufPresenceSnapshot.Capture();
+            var signature = presence.Signature;
+            if (!string.Equals(signature, _lastPresenceSignature, StringComparison.Ordinal))
+            {
+                _lastPresenceSignature = signature;
+                LogInput($"[DETECT] Presence: {signature}");
+            }
+
+            LastPresence = presence;
+            return presence;
+        }
+
+        /// <summary>Shows why nothing can connect: missing driver, Windows device error, or simply no device.</summary>
+        private void ApplyPresenceStatus(ScufPresenceSnapshot presence)
+        {
+            var wired = presence.Wired;
+            var receiver = presence.Receiver;
+            var failing = new[] { wired, receiver }.FirstOrDefault(device => device?.Readiness == ScufDeviceReadiness.DeviceError);
+            if (failing != null)
+            {
+                SetConnectionStatus(
+                    ConnectionStatusState.Error,
+                    LocalizationService.Get("StatusDeviceErrorTitle"),
+                    string.Format(
+                        LocalizationService.Get("StatusDeviceErrorFormat"),
+                        LocalizationService.Get(failing.Path == ScufConnectionPath.Wired ? "DeviceNameWired" : "DeviceNameReceiver"),
+                        failing.ProblemCode));
+                return;
+            }
+
+            var pendingRestart = new[] { wired, receiver }.FirstOrDefault(device => device?.Readiness == ScufDeviceReadiness.RestartPending);
+            if (pendingRestart != null)
+            {
+                SetConnectionStatus(
+                    ConnectionStatusState.Error,
+                    LocalizationService.Get("StatusDriverRestartPendingTitle"),
+                    LocalizationService.Get(pendingRestart.Path == ScufConnectionPath.Wired ? "StatusWiredRestartPending" : "StatusReceiverRestartPending"));
+                return;
+            }
+
+            if (wired?.Readiness == ScufDeviceReadiness.MissingDriver || receiver?.Readiness == ScufDeviceReadiness.MissingDriver)
+            {
+                SetConnectionStatus(
+                    ConnectionStatusState.Error,
+                    LocalizationService.Get("StatusDriverMissingTitle"),
+                    LocalizationService.Get(wired?.Readiness == ScufDeviceReadiness.MissingDriver ? "StatusWiredDriverMissing" : "StatusReceiverDriverMissing"));
+                return;
+            }
+
+            if (wired?.Readiness == ScufDeviceReadiness.Settling || receiver?.Readiness == ScufDeviceReadiness.Settling)
+            {
+                SetConnectionStatus(
+                    ConnectionStatusState.ReceiverOnly,
+                    LocalizationService.Get("StatusWaitingController"),
+                    LocalizationService.Get("StatusDeviceSettling"));
+                return;
+            }
+
+            SetWaitingForControllerStatus();
         }
 
         public async Task ConnectAsync(bool autoConnect = false)
@@ -84,6 +205,9 @@ namespace ZeroCue.DataProbe.Services
             if (Volatile.Read(ref _connectionSuspensionCount) != 0) return;
 
             await _connectionAttemptGate.WaitAsync();
+            var attemptCts = new CancellationTokenSource();
+            Volatile.Write(ref _connectAttemptCts, attemptCts);
+            var attemptToken = attemptCts.Token;
             try
             {
                 if (IsConnected) return;
@@ -101,24 +225,37 @@ namespace ZeroCue.DataProbe.Services
                 {
                 try
                 {
-                    _context = new UsbContext();
-                    var dev = FindSupportedWiredUsbDevice(_context, !autoConnect);
+                    // Only open transports that PnP reports as WinUSB-bound; probing
+                    // absent or HID-bound devices just burns seconds and floods the log.
+                    var presence = RefreshPresence();
+                    UsbDevice? dev = null;
+                    if (presence.IsWiredReady)
+                    {
+                        _context = new UsbContext();
+                        dev = FindSupportedWiredUsbDevice(_context, !autoConnect);
+                        if (dev == null)
+                        {
+                            _context.Dispose();
+                            _context = null;
+                        }
+                    }
 
                     if (dev == null)
                     {
-                        _context.Dispose();
-                        _context = null;
-
-                        if (await TryConnectWirelessAsync(autoConnect))
+                        if (presence.IsReceiverReady && await TryConnectWirelessAsync(autoConnect))
                         {
                             return;
                         }
 
-                        _context = new UsbContext();
-                        dev = FindSupportedWiredUsbDevice(_context, true);
-                        if (dev != null)
+                        presence = RefreshPresence();
+                        if (presence.IsWiredReady)
                         {
-                            LogInput("[SYSTEM] Dispositivo USB detectado tras finalizar o interrumpir el probe wireless.");
+                            _context = new UsbContext();
+                            dev = FindSupportedWiredUsbDevice(_context, false);
+                            if (dev != null)
+                            {
+                                LogInput("[SYSTEM] Wired controller became available after the wireless attempt.");
+                            }
                         }
                     }
 
@@ -127,12 +264,17 @@ namespace ZeroCue.DataProbe.Services
                         _context?.Dispose();
                         _context = null;
 
-                        if (autoConnect)
+                        if (autoConnect || presence.Devices.Count > 0)
                         {
-                            SetWaitingForControllerStatus();
+                            if (!IsConnected)
+                            {
+                                ApplyPresenceStatus(presence);
+                            }
+
                             return;
                         }
-                        throw new Exception("Mando Scuf no encontrado. Asegura el driver WinUSB.");
+
+                        throw new Exception(LocalizationService.Get("StatusConnectControllerHint"));
                     }
                     var wiredIdentity = DeviceProfile.FindWiredDevice(dev.VendorId, dev.ProductId);
                     if (wiredIdentity?.IsExperimental == true)
@@ -173,14 +315,15 @@ namespace ZeroCue.DataProbe.Services
                     // Handshake Control Transfers
                     UsbDevice.ControlTransferTimeout = 1000;
                     LogInput("[SYSTEM] Enviando transferencia de control: Handshake Fase 1 (0x0303)...");
-                    if (!SendControl(HANDSHAKE_IFACE, new byte[] { 0x03, 0x1D, 0x01 }, 0x0303))
-                        throw new Exception("Handshake Fase 1 falló.");
+                    if (!SendControl(HANDSHAKE_IFACE, new byte[] { 0x03, 0x1D, 0x01 }, 0x0303, out var phase1Error))
+                        throw new Exception($"Handshake Fase 1 falló: {phase1Error}");
                     Thread.Sleep(100);
 
                     LogInput("[SYSTEM] Enviando transferencia de control: Handshake Fase 2 (0x03CC)...");
-                    if (!SendControl(HANDSHAKE_IFACE, new byte[] { 0xCC, 0x60 }, 0x03CC))
-                        throw new Exception("Handshake Fase 2 falló.");
+                    if (!SendControl(HANDSHAKE_IFACE, new byte[] { 0xCC, 0x60 }, 0x03CC, out var phase2Error))
+                        throw new Exception($"Handshake Fase 2 falló: {phase2Error}");
                     Thread.Sleep(200);
+                    attemptToken.ThrowIfCancellationRequested();
 
                     // SET_IDLE commands
                     LogInput("[SYSTEM] Enviando solicitudes de clase SET_IDLE a interfaces 3 y 4...");
@@ -207,8 +350,13 @@ namespace ZeroCue.DataProbe.Services
                     }
                     catch (Exception ex)
                     {
+                        // Drop the unplugged target: submitting reports to it would throw
+                        // and tear down the wired session that monitor mode should keep.
                         IsViGEmActive = false;
-                        LogInput($"[VIGEM] ERROR: {ex.Message}. Corriendo en modo monitor.");
+                        _xbox = null;
+                        try { _client?.Dispose(); } catch { }
+                        _client = null;
+                        LogInput($"[VIGEM] ERROR: {ex.Message}. Running in monitor mode (keyboard/mouse mappings stay active).");
                     }
 
                     // Open readers
@@ -255,7 +403,8 @@ namespace ZeroCue.DataProbe.Services
                     }
 
                     LogInput("[SYSTEM] Ejecutando inicializacion de Software Mode...");
-                    await InitializeUsbSoftwareModeOrThrowAsync(CancellationToken.None);
+                    await InitializeUsbSoftwareModeOrThrowAsync(attemptToken);
+                    attemptToken.ThrowIfCancellationRequested();
 
                     // Start background thread for polling
                     LogInput("[SYSTEM] Iniciando hilo de captura/polling en segundo plano...");
@@ -265,9 +414,11 @@ namespace ZeroCue.DataProbe.Services
                     var auxiliaryFrames = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(128)
                     {
                         SingleReader = true,
-                        SingleWriter = true,
+                        // The ACK reader forwards input frames it reads while waiting for ACKs.
+                        SingleWriter = false,
                         FullMode = BoundedChannelFullMode.Wait
                     });
+                    _wiredAuxiliaryFrames = auxiliaryFrames.Writer;
                     var primaryReader = _reader!;
                     var auxiliaryReader = _reader2;
                     // Dedicated workers keep blocking native USB calls off the thread pool.
@@ -288,11 +439,19 @@ namespace ZeroCue.DataProbe.Services
                         LocalizationService.Get("StatusControllerConnected"),
                         LocalizationService.Get("StatusControllerActive"));
                     LogInput("[SYSTEM] Dispositivo conectado y configurado correctamente");
+                    _lastWiredConnectFailure = null;
                 }
                 catch (Exception ex)
                 {
                     IsConnecting = false;
                     Disconnect();
+                    // Auto-connect retries every couple of seconds; log each distinct cause once.
+                    if (!string.Equals(_lastWiredConnectFailure, ex.Message, StringComparison.Ordinal))
+                    {
+                        _lastWiredConnectFailure = ex.Message;
+                        LogInput($"[USB] Wired connection attempt failed: {ex.GetType().Name}: {ex.Message}");
+                    }
+
                     if (!autoConnect)
                     {
                         SetConnectionStatus(
@@ -306,7 +465,22 @@ namespace ZeroCue.DataProbe.Services
             }
             finally
             {
+                Volatile.Write(ref _connectAttemptCts, null);
+                attemptCts.Dispose();
                 _connectionAttemptGate.Release();
+            }
+        }
+
+        private CancellationTokenSource? _connectAttemptCts;
+
+        private void CancelInFlightConnectionAttempt()
+        {
+            try { Volatile.Read(ref _connectAttemptCts)?.Cancel(); } catch (ObjectDisposedException) { }
+
+            if (!IsConnected)
+            {
+                // A wireless attempt runs on the session token until it is established.
+                try { _wirelessSessionCts?.Cancel(); } catch (ObjectDisposedException) { }
             }
         }
 
@@ -358,11 +532,14 @@ namespace ZeroCue.DataProbe.Services
 
             _cts?.Cancel();
 
-            try { CleanupWirelessAsync().Wait(1000); } catch { }
+            // Run async cleanup on the thread pool: Disconnect is often called from the
+            // UI thread, where awaiting continuations would deadlock against .Wait().
+            try { Task.Run(CleanupWirelessAsync).Wait(3000); } catch { }
 
-            if (_modeController != null)
+            var modeController = _modeController;
+            if (modeController != null)
             {
-                try { _modeController.StopIcueKeepAliveAsync().Wait(500); } catch { }
+                try { Task.Run(modeController.StopIcueKeepAliveAsync).Wait(2000); } catch { }
                 _modeController = null;
             }
 
@@ -402,6 +579,9 @@ namespace ZeroCue.DataProbe.Services
             _reader2 = null;
             _writer2 = null;
             _rumbleWriter = null;
+            _wiredAuxiliaryFrames = null;
+
+            ReleaseAllSyntheticOutputs("disconnect");
 
             try { WriteTelemetryComm($"\n=== Session Ended: {DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} ==="); }
             catch { }
@@ -513,7 +693,7 @@ namespace ZeroCue.DataProbe.Services
             }
 
             _transport = new ScufRawTransport(_reader2, _writer2, LogInput);
-            _ackReader = new ScufAckReader(_transport);
+            _ackReader = new ScufAckReader(_transport, ForwardWiredAuxiliaryFrame);
             _modeController = new DeviceModeController(UsbLock, _ackReader, _transport, LogInput);
 
             Exception? lastError = null;
@@ -544,19 +724,33 @@ namespace ZeroCue.DataProbe.Services
             throw new TimeoutException("No se pudo completar el handshake de Software Mode por USB.", lastError);
         }
 
-        private bool SendControl(int iface, byte[] payload, int wValue)
+        private string? _lastWiredConnectFailure;
+
+        private bool SendControl(int iface, byte[] payload, int wValue, out string error)
         {
-            if (_device == null) return false;
+            error = string.Empty;
+            if (_device == null)
+            {
+                error = "device not open";
+                return false;
+            }
+
             byte[] buf = new byte[DeviceProfile.ReportSize];
             Array.Copy(payload, buf, payload.Length);
             var setup = new UsbSetupPacket((byte)0x21, 0x09, (short)wValue, (short)iface, 64);
             try
             {
                 int transferred = _device.ControlTransfer(setup, buf, 0, 64);
+                if (transferred <= 0)
+                {
+                    error = $"transferred={transferred}";
+                }
+
                 return transferred > 0;
             }
-            catch
+            catch (Exception ex)
             {
+                error = $"{ex.GetType().Name}: {ex.Message}";
                 return false;
             }
         }
@@ -565,6 +759,24 @@ namespace ZeroCue.DataProbe.Services
         {
             try { _cts?.Cancel(); } catch { }
             _ = Task.Run(Disconnect);
+        }
+
+        private ChannelWriter<byte[]>? _wiredAuxiliaryFrames;
+
+        /// <summary>Queues G-key/software-button frames that the ACK reader consumed from Ep82.</summary>
+        private void ForwardWiredAuxiliaryFrame(byte[] frame, int length)
+        {
+            var writer = _wiredAuxiliaryFrames;
+            if (writer == null)
+            {
+                return;
+            }
+
+            bool isInput = (length >= 2 && frame[0] == 0x11) || (length >= 7 && frame[0] == 0x03 && frame[2] == 0x02);
+            if (isInput && !writer.TryWrite(frame))
+            {
+                LogInput("[USB] Auxiliary input queue full; dropped a G-key frame read during a command.");
+            }
         }
 
         private void PollAuxiliaryInput(UsbEndpointReader? reader, ChannelWriter<byte[]> frames, CancellationToken token)
@@ -685,19 +897,33 @@ namespace ZeroCue.DataProbe.Services
                     // IN 0x81 is independent of the control/ACK pipe. Never hold
                     // UsbLock here: a secondary timeout must not stall stick input.
                     err = reader.Read(buf, 150, out xferred);
-                    if (err != Error.Success && err != Error.Io)
+                    if (err == Error.Success)
                     {
-                        consecutiveErrors++;
-                        if (consecutiveErrors > 10)
-                        {
-                            LogInput($"[FATAL] Demasiados errores consecutivos ({err}). Desconectando...");
-                            RequestUsbDisconnectFromPolling();
-                            break;
-                        }
+                        consecutiveErrors = 0;
+                    }
+                    else if (err == Error.NoDevice)
+                    {
+                        LogInput("[USB] Wired controller removed (NoDevice). Disconnecting.");
+                        RequestUsbDisconnectFromPolling();
+                        break;
                     }
                     else
                     {
-                        consecutiveErrors = 0;
+                        // The controller streams continuously, so ten consecutive timeouts
+                        // (~1.5 s without data) or I/O errors mean the link is gone. I/O
+                        // errors previously reset this counter and spun forever after unplug.
+                        consecutiveErrors++;
+                        if (consecutiveErrors > 10)
+                        {
+                            LogInput($"[USB] Too many consecutive read errors ({err}). Disconnecting.");
+                            RequestUsbDisconnectFromPolling();
+                            break;
+                        }
+
+                        if (err != Error.Timeout && token.WaitHandle.WaitOne(5))
+                        {
+                            break;
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -1293,30 +1519,12 @@ namespace ZeroCue.DataProbe.Services
             return selected;
         }
 
-        private bool IsWiredUsbDevicePresent()
-        {
-            try
-            {
-                using var context = new UsbContext();
-                bool found = false;
-                foreach (var device in context.List())
-                {
-                    if (!found && DeviceProfile.IsWired(device.VendorId, device.ProductId))
-                    {
-                        found = true;
-                    }
-                    if (device is IDisposable disposableDevice)
-                    {
-                        try { disposableDevice.Dispose(); } catch { }
-                    }
-                }
-                return found;
-            }
-            catch
-            {
-                return false;
-            }
-        }
+        /// <summary>
+        /// True when a wired controller is connected and usable. A cable used only
+        /// for charging (no ZeroCue driver) must not tear down a working wireless
+        /// session, which previously caused a connect/disconnect loop.
+        /// </summary>
+        private bool IsWiredUsbDevicePresent() => ScufPresenceSnapshot.Capture().IsWiredReady;
 
         public void SetEcoMode(bool enable)
         {

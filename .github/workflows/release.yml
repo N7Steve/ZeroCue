@@ -19,7 +19,9 @@ jobs:
         with:
           global-json-file: global.json
           cache: true
-          cache-dependency-path: ZeroCue.DataProbe/packages.lock.json
+          cache-dependency-path: |
+            ZeroCue.DataProbe/packages.lock.json
+            tests/ZeroCue.Tests/packages.lock.json
 
       - name: Read version from tag
         id: version
@@ -33,7 +35,7 @@ jobs:
           "value=$($Matches.version)" >> $env:GITHUB_OUTPUT
 
       - name: Restore locked dependencies
-        run: dotnet restore ZeroCue.DataProbe/ZeroCue.DataProbe.csproj --locked-mode
+        run: dotnet restore ZeroCue.sln --locked-mode
 
       - name: Verify bundled runtime assets
         shell: pwsh
@@ -48,7 +50,10 @@ jobs:
         run: ./scripts/collect-third-party-notices.ps1 -DestinationRoot "$env:RUNNER_TEMP\zerocue-license-audit"
 
       - name: Build
-        run: dotnet build ZeroCue.DataProbe/ZeroCue.DataProbe.csproj --configuration Release --no-restore
+        run: dotnet build ZeroCue.sln --configuration Release --no-restore
+
+      - name: Unit tests (drivers, device detection, catalog)
+        run: dotnet test tests/ZeroCue.Tests/ZeroCue.Tests.csproj --configuration Release --no-build
 
       - name: Verify input concurrency and cancellation without hardware
         run: dotnet run --project tests/ZeroCue.InputChecks/ZeroCue.InputChecks.csproj --configuration Release

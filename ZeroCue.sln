@@ -1,0 +1,49 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroCue.DataProbe", "ZeroCue.DataProbe\ZeroCue.DataProbe.csproj", "{A944566E-A06A-45F6-958D-1EE549DD9E80}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{212C470E-8B3E-4920-8403-B0925DFFFBF1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroCue.Tests", "tests\ZeroCue.Tests\ZeroCue.Tests.csproj", "{86645B5A-A659-4BF3-B5AB-FFCCBFA86083}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroCue.InputChecks", "tests\ZeroCue.InputChecks\ZeroCue.InputChecks.csproj", "{C679DB09-E470-4DB6-9AD5-A781C1C9B5BB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{B5151705-5726-4BD0-889A-0C7755AABCE5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ZeroCue.XInputProbe", "tools\ZeroCue.XInputProbe\ZeroCue.XInputProbe.csproj", "{F35AE26C-9F12-46B8-85DB-EBEB30F5E725}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A944566E-A06A-45F6-958D-1EE549DD9E80}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A944566E-A06A-45F6-958D-1EE549DD9E80}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A944566E-A06A-45F6-958D-1EE549DD9E80}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A944566E-A06A-45F6-958D-1EE549DD9E80}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86645B5A-A659-4BF3-B5AB-FFCCBFA86083}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86645B5A-A659-4BF3-B5AB-FFCCBFA86083}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86645B5A-A659-4BF3-B5AB-FFCCBFA86083}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86645B5A-A659-4BF3-B5AB-FFCCBFA86083}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C679DB09-E470-4DB6-9AD5-A781C1C9B5BB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C679DB09-E470-4DB6-9AD5-A781C1C9B5BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C679DB09-E470-4DB6-9AD5-A781C1C9B5BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C679DB09-E470-4DB6-9AD5-A781C1C9B5BB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F35AE26C-9F12-46B8-85DB-EBEB30F5E725}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F35AE26C-9F12-46B8-85DB-EBEB30F5E725}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F35AE26C-9F12-46B8-85DB-EBEB30F5E725}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F35AE26C-9F12-46B8-85DB-EBEB30F5E725}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{86645B5A-A659-4BF3-B5AB-FFCCBFA86083} = {212C470E-8B3E-4920-8403-B0925DFFFBF1}
+		{C679DB09-E470-4DB6-9AD5-A781C1C9B5BB} = {212C470E-8B3E-4920-8403-B0925DFFFBF1}
+		{F35AE26C-9F12-46B8-85DB-EBEB30F5E725} = {B5151705-5726-4BD0-889A-0C7755AABCE5}
+	EndGlobalSection
+EndGlobal

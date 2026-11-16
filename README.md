@@ -111,27 +111,41 @@ use one unified 64-byte WinUSB transport on `OUT 0x01` / `IN 0x81`; ZeroCue keep
 one reader on that shared ACK/input endpoint. Base identities continue to use
 `MI_04` (`0x02` / `0x82`) for control and `MI_03` (`IN 0x81`) for input.
 
+Driver operations run in a dedicated elevated mode of `zerocue.exe`
+(`--driver-helper`); the Windows administrator prompt names ZeroCue itself.
+The helper rebuilds its plan from live Plug and Play state, verifies the
+bundled `wdi-simple.exe` against a pinned SHA-256 before every run, executes it
+from a directory only administrators can write, and reports progress and a
+structured result back to the app. Only one driver operation can run at a time.
+
 The wired V2 installer applies bindings in the deterministic order `MI_04`,
-`MI_03`, then `MI_00`, including `1B1C:3A04`. Each binding gets up to three
-complete `wdi-simple` attempts. ZeroCue lets the helper finish normally, rescans
-PnP, waits for every exact matching instance to report the WinUSB service, and
-then runs an idempotent convergence pass to repair any interface displaced while
-the composite device re-enumerated.
+`MI_03`, then `MI_00`, including `1B1C:3A04`. When a ZeroCue package for a
+binding already exists in the Windows Driver Store, it is applied directly in a
+few seconds; Windows does not re-select drivers for a device it already knows,
+so a staged package alone is not enough. Otherwise `wdi-simple` creates the
+package (up to three attempts per binding). After all bindings, a convergence
+pass repairs any interface displaced while the composite device re-enumerated.
 
 Receiver installation prepares every transport state of the selected hardware
 variant in one operation. For V2 this means the base `3A08` packages for `MI_04`
 and `MI_03` plus the whole-device active `3A09` package. The base and active PID
 states are mutually exclusive, so an absent binding is accepted only when its
-exact WinUSB package is present in the Driver Store; every binding that is
-currently present must actually report the WinUSB service. This prevents a
-normal `3A08` to `3A09` transition from being misreported as an `MI_04` failure.
-An endpoint-probe warning does not undo valid WinUSB bindings. Partial packages
-are retained in the ownership manifest so a later retry can converge and the
-explicit restore action can still recover them. Recovery waits for every
-previously present interface to return on its original driver before reporting
-success. Installation diagnostics include present and phantom vendor PnP nodes,
-parent and problem-code properties, per-attempt debug output, package readiness,
-and bounded rescan output.
+exact ZeroCue WinUSB package is staged in the Driver Store; every binding that
+is currently present must actually report the WinUSB service. iCUE and the
+Corsair services are stopped during the operation and only the ones that were
+running before are started again; iCUE is relaunched without administrator
+rights. A result of "reboot required" is reported as such, not as a failure.
+
+Restore removes only packages whose INF content identifies them as ZeroCue
+packages (or the narrow fingerprints of early ZeroCue builds and Zadig packages
+for these exact SCUF interfaces) for the exact managed hardware IDs, then waits
+for every interface it reset to return on a working non-WinUSB driver.
+
+At runtime ZeroCue checks which SCUF devices are connected and which driver they
+use before opening anything. If the controller or receiver is connected without
+the ZeroCue driver, or Windows reports a device error (for example Code 10 on an
+underpowered hub), the status panel says so instead of retrying silently.
+Plugging or unplugging a device is detected immediately.
 
 ZeroCue is not required for recovery. You can use Windows Device Manager as an
 administrator, locate only the SCUF controller or receiver interfaces modified by
@@ -164,8 +178,9 @@ details you do not want to share publicly.
 ## Alpha limitations
 
 - Only Windows x64 is supported.
-- `wdi-simple.exe` is the existing unsigned alpha helper. It is pinned by
-  SHA-256, but its exact historical build recipe has not been reconstructed.
+- `wdi-simple.exe` is the existing unsigned alpha helper. It is verified against a
+  pinned SHA-256 before every elevated run, but its exact historical build recipe
+  has not been reconstructed.
 - The application executable is not yet Authenticode-signed.
 
 See [SECURITY.md](SECURITY.md) for private vulnerability reporting.

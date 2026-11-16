@@ -5,9 +5,9 @@ Documento de traspaso para el siguiente agente o sesión. Léelo junto a `AGENTS
 
 ## 1. Estado actual
 
-- Rama `main`, último commit `e86fdac`. **Hay 28 cambios sin commitear:** todo el lote de
-  drivers, detección y USB descrito abajo. El usuario solo hace commit cuando lo confirma
-  explícitamente (regla global de git).
+- Rama `main`. **Publicada la release `v0.1.0-alpha.19`** (16/11/2026, 5 commits `921c731`..`11af02b`,
+  tag `v0.1.0-alpha.19`). El lote de drivers, detección y USB descrito abajo ya está commiteado.
+  Comprobar que el workflow Release de GitHub terminó bien (no se pudo ver desde aquí: `gh` sin login).
 - La build y los tests están en verde:
   - `dotnet build ZeroCue.sln -c Release`: 0 warnings, con warnings tratados como errores.
   - `tests/ZeroCue.Tests`: 49 tests xUnit.

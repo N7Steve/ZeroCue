@@ -1,306 +1,71 @@
 [CmdletBinding()]
 param()
 
+# Structural checks that the compiler and unit tests cannot express.
+# Behavioural driver rules (device catalog, package ownership, restore
+# boundaries) are covered by tests/ZeroCue.Tests (DriverCatalogTests,
+# InfClassifierTests, DriverOperationEngineTests); run `dotnet test` too.
+
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
-$servicePath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\DriverAutomationService.cs"
-$source = Get-Content -LiteralPath $servicePath -Raw
-$profilePath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\SupportedScufDeviceProfile.cs"
-$profileSource = Get-Content -LiteralPath $profilePath -Raw
-$wiredServicePath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\ScufDeviceService.Usb.cs"
-$wiredServiceSource = Get-Content -LiteralPath $wiredServicePath -Raw
-$transportPath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\WirelessDongleWinUsbTransport.cs"
-$transportSource = Get-Content -LiteralPath $transportPath -Raw
-$probePath = Join-Path $repoRoot "ZeroCue.DataProbe\Services\WirelessWinUsbAggressiveSessionProbe.cs"
-$probeSource = Get-Content -LiteralPath $probePath -Raw
+$servicesRoot = Join-Path $repoRoot "ZeroCue.DataProbe\Services"
+$sources = Get-ChildItem -LiteralPath $servicesRoot -Recurse -Filter *.cs |
+    ForEach-Object { [pscustomobject]@{ Path = $_.FullName; Text = Get-Content -LiteralPath $_.FullName -Raw } }
 
-$startMarker = "private Task<bool> RestoreDefaultDriversAsync"
-$endMarker = "private static Dictionary<string, string> ParseKeyValueResult"
-$start = $source.IndexOf($startMarker, [System.StringComparison]::Ordinal)
-$end = $source.IndexOf($endMarker, $start, [System.StringComparison]::Ordinal)
-if ($start -lt 0 -or $end -le $start) {
-    throw "Could not locate the driver restoration implementation for safety verification."
+function Get-Source([string]$relativePath) {
+    $path = Join-Path $servicesRoot $relativePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        throw "Expected source file is missing: $relativePath"
+    }
+
+    Get-Content -LiteralPath $path -Raw
 }
 
-$restoreSource = $source.Substring($start, $end - $start)
-$forbiddenFragments = @(
-    "libwdi|WinUSB",
-    "/subtree",
-    "Get-FileHash",
-    "LegacyInfSha256"
-)
+# 1. Elevation only through the in-process helper; never generated PowerShell.
+foreach ($source in $sources) {
+    if ($source.Text -match 'Verb\s*=\s*"runas"' -and $source.Path -notlike '*DriverAutomationService.cs') {
+        throw "Only DriverAutomationService may request elevation: $($source.Path)"
+    }
 
-foreach ($fragment in $forbiddenFragments) {
-    if ($restoreSource.IndexOf($fragment, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-        throw "Unsafe broad driver restoration fragment found: $fragment"
+    if ($source.Text -match '-ExecutionPolicy' -or $source.Text -match 'FileName\s*=\s*"powershell\.exe"') {
+        throw "Driver operations must not run PowerShell scripts: $($source.Path)"
     }
 }
 
-$requiredFragments = @(
-    "LoadOwnedDriverPackages(config)",
-    '$targetDevices',
-    '$initialWinUsbDevices',
-    '$legacyHardwareIds',
-    'config.Variants',
-    'variant.ObsoleteBindings.Select',
-    '$hasLegacyIdentity',
-    '$hasScopedZadigIdentity',
-    '$hasOrphanedZeroCueIdentity',
-    '$isLegacyZeroCueWinUsb',
-    'WinUSBDeviceClassReg',
-    'AddService\\s*=\\s*WinUSB',
-    'DeviceName\\s*=\\s*\"SCUF\"',
-    'SourceName\\s*=\\s*\"SCUF Install Disk\"',
-    'Provider\\s*=\\s*\"libwdi\"',
-    'Class\\s*=\\s*\"USBDevice\"',
-    'CatalogFile\\s*=\\s*usb_device\\.cat',
-    'DriverVer\\s*=\\s*04/18/2019',
-    'VendorName\\s*=\\s*\"Corsair\"',
-    'DeviceName\\s*=\\s*\"SCUF[^\"]+\"',
-    'DriverVer\\s*=\\s*06/02/2012',
-    "DEVPKEY_Device_DriverInfPath",
-    '$verifiedInfs -contains $driverInf',
-    'pnputil /remove-device',
-    'pnputil /delete-driver $infName /uninstall /force',
-    "content -notmatch 'ZeroCue'",
-    '$remainingWinUsbDevices',
-    '$targetHardwareIds',
-    'Get-PnpDevice -PresentOnly',
-    '$presentTargetDevicesBefore',
-    '$presentTargetDevices',
-    '$remainingWinUsbDevices = @($presentTargetDevices | Where-Object { $_.Service -match ''WINUSB'' })',
-    '$failureCount += $remainingWinUsbDevices.Count',
-    '$expectedPresentInterfaceHardwareIds',
-    '$restoredInterfaceHardwareIds',
-    '$missingInterfaceHardwareIds',
-    '$failureCount += $missingInterfaceHardwareIds.Count',
-    '$compositeParentInstanceIds',
-    'pnputil.exe /restart-device $compositeParentInstanceId',
-    '$verifiedInfs.Count -eq 0 -and $initialWinUsbDevices.Count -gt 0',
-    'packages=$($verifiedInfs -join '','')',
-    'remaining=$($remainingWinUsbDevices.InstanceId -join ''|'')',
-    'expectedInterfaces=$($expectedPresentInterfaceHardwareIds -join ''|'')',
-    'restoredInterfaces=$($restoredInterfaceHardwareIds -join ''|'')',
-    'missingInterfaces=$($missingInterfaceHardwareIds -join ''|'')'
-)
+$automation = Get-Source "DriverAutomationService.cs"
+if ($automation -notmatch 'DriverHelperArguments\.Build') {
+    throw "Elevation must launch the --driver-helper mode of the application."
+}
 
-foreach ($fragment in $requiredFragments) {
-    if ($restoreSource.IndexOf($fragment, [System.StringComparison]::Ordinal) -lt 0) {
-        throw "Required driver restoration boundary is missing: $fragment"
+# 2. The helper verifies wdi-simple against the same pinned hash as the release assets.
+$helper = Get-Source "Drivers\ElevatedDriverHelper.cs"
+$assetScript = Get-Content -LiteralPath (Join-Path $repoRoot "scripts\verify-runtime-assets.ps1") -Raw
+$pinned = [regex]::Match($helper, 'WdiSimpleSha256\s*=\s*"(?<hash>[0-9A-F]{64})"').Groups['hash'].Value
+if (-not $pinned) {
+    throw "ElevatedDriverHelper must pin the SHA-256 of wdi-simple.exe."
+}
+
+if ($assetScript -notmatch [regex]::Escape($pinned)) {
+    throw "The helper's pinned wdi-simple hash does not match scripts/verify-runtime-assets.ps1."
+}
+
+foreach ($fragment in @('SHA256.HashData', 'CreateProtectedWorkDirectory', 'SetAccessRuleProtection', 'LOAD_LIBRARY_SEARCH_SYSTEM32', 'OperationMutexName')) {
+    if ($helper.IndexOf($fragment, [System.StringComparison]::Ordinal) -lt 0) {
+        throw "Elevated helper safety boundary is missing: $fragment"
     }
 }
 
-$migrationStartMarker = "private static void AppendObsoleteBindingMigrationScript"
-$migrationEndMarker = "private async Task<bool> ValidateReceiverWinUsbTopologyAsync"
-$migrationStart = $source.IndexOf($migrationStartMarker, [System.StringComparison]::Ordinal)
-$migrationEnd = $source.IndexOf($migrationEndMarker, $migrationStart, [System.StringComparison]::Ordinal)
-if ($migrationStart -lt 0 -or $migrationEnd -le $migrationStart) {
-    throw "Could not locate the obsolete receiver binding migration for safety verification."
+# 3. Package removal is always gated by INF classification, never by name patterns.
+$engine = Get-Source "Drivers\DriverOperationEngine.cs"
+if ($engine -match '/subtree') {
+    throw "Driver operations must stay limited to exact PnP instances (/subtree is forbidden)."
 }
 
-$migrationSource = $source.Substring($migrationStart, $migrationEnd - $migrationStart)
-$requiredMigrationFragments = @(
-    '$obsoleteDevices',
-    'DEVPKEY_Device_DriverInfPath',
-    '$hasExactHardwareId',
-    '$isWinUsbPackage',
-    '$isManifestOwned',
-    '$isZeroCueOwned',
-    '$hasLegacyIdentity',
-    '$hasScopedZadigIdentity',
-    '$containsRequiredReceiverBinding',
-    '$isVerifiedObsoletePackage',
-    'pnputil.exe /remove-device $obsoleteDevice.InstanceId',
-    'pnputil.exe /delete-driver $driverInf /uninstall /force',
-    '$migrationFailures++'
-)
-
-foreach ($fragment in $requiredMigrationFragments) {
-    if ($migrationSource.IndexOf($fragment, [System.StringComparison]::Ordinal) -lt 0) {
-        throw "Required obsolete binding migration boundary is missing: $fragment"
-    }
+$deleteCalls = [regex]::Matches($engine, '"/delete-driver"').Count
+if ($deleteCalls -lt 1 -or [regex]::Matches($engine, 'InfClassifier\.Classify').Count -lt 2) {
+    throw "Driver package deletion must be preceded by InfClassifier ownership checks."
 }
 
-if ($migrationSource -match '/subtree') {
-    throw "The obsolete receiver binding migration must remain limited to the exact PnP instance."
-}
-
-$requiredPortableTargets = @(
-    '"0x1B1C"',
-    '"0x3A05"',
-    '"0x3A04"',
-    '"0x3A08"',
-    '"0x3A09"',
-    '"0x2E95"',
-    '"0x434B"',
-    '"0x434D"',
-    '"0x434E"',
-    '"0x5046"',
-    'new DriverBinding("0x3A08", 4, "V2 interface 4 (MI_04)")',
-    'new DriverBinding("0x3A08", 3, "V2 interface 3 (MI_03)")',
-    'new ObsoleteDriverBinding("0x3A08", 0, "obsolete V2 interface 0 (MI_00)")',
-    'new DriverBinding("0x3A09", null, "V2 active receiver device")',
-    'new DriverBinding("0x434E", 4, "experimental V1 interface 4 (MI_04)")',
-    'new DriverBinding("0x434E", 3, "experimental V1 interface 3 (MI_03)")',
-    'new DriverBinding("0x5046", null, "experimental V1 active receiver device")',
-    'new DriverBinding("0x3A05", 0, "interface 0 (MI_00)")',
-    'new DriverBinding("0x3A05", 4, "interface 4 (MI_04)")',
-    'new DriverBinding("0x3A05", 3, "interface 3 (MI_03)")',
-    'new DriverBinding("0x3A04", 0, "interface 0 (MI_00)")',
-    'new DriverBinding("0x3A04", 4, "interface 4 (MI_04)")',
-    'new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")',
-    'new DriverBinding("0x434D", 0, "experimental V1 Pro interface 0 (MI_00)")',
-    'new DriverBinding("0x434D", 4, "experimental V1 Pro interface 4 (MI_04)")',
-    'new DriverBinding("0x434D", 3, "experimental V1 Pro interface 3 (MI_03)")',
-    'new DriverBinding("0x434B", 0, "experimental V1 interface 0 (MI_00)")',
-    'new DriverBinding("0x434B", 4, "experimental V1 interface 4 (MI_04)")',
-    'new DriverBinding("0x434B", 3, "experimental V1 interface 3 (MI_03)")',
-    'manifestHardwareIds.IsSubsetOf(expectedHardwareIds)',
-    '$candidateDevices.Count -gt 0',
-    '$selectionAttempt -le 6',
-    'Driver target selection attempt=$selectionAttempt/6',
-    'if ($interfaceId -ge 0) { $argsArray += @(''-i'', [string]$interfaceId) }',
-    "'-o', '30000', '-l', '0'",
-    '$proc.WaitForExit(90000)',
-    '$driverAttempt -le 3',
-    '$alreadyReady',
-    '$firstPassResultCodes',
-    'Starting WinUSB convergence pass',
-    'Final WinUSB readiness attempt=',
-    "Where-Object { `$_.Service -notmatch '^WinUSB`$' }",
-    'taskkill.exe /PID $proc.Id /T /F',
-    'install diagnostics retained at:',
-    'resultCodes.Length == expectedResultCount',
-    'Where(package => File.Exists(Path.Combine(windowsInfDirectory, package)))',
-    'DeleteOwnedDriverPackageManifest(config);',
-    'ValidateReceiverWinUsbTopologyAsync(selectedVid, selectedPid, selectedVariant!)',
-    'Keeping the completed driver bindings so reconnecting or rerunning can converge without destructive rollback.',
-    'function Get-StagedWinUsbInf',
-    '$allowAbsent -and $existingDevices.Count -eq 0 -and $stagedInf',
-    'Binding transitioned to another receiver state after package staging',
-    '$_.Variant -eq $selectedVariant',
-    '$allowAbsentRequiredBindings = $true',
-    '$presentReady = ($allowAbsentRequiredBindings -and $matchingDevices.Count -eq 0)',
-    'selectedVariant.Bindings.Length',
-    'Write-PnpSnapshot -label ''selected-before-install''',
-    'selection-failed-all-vendor-nodes-including-phantoms',
-    'Write-PnpBasicSnapshot',
-    '-limit 40',
-    'DEVPKEY_Device_ProblemCode',
-    'DEVPKEY_Device_Parent',
-    'wdi-simple stdout tail',
-    'wdi-simple stderr tail',
-    'Start-Transcript -LiteralPath',
-    'LogFileContents(restoreLogPath',
-    'Receiver topology validation attempt={attempt}/{maxAttempts}',
-    'candidateStates=',
-    'detectedState=',
-    'driverVariant.PidValues.Contains',
-    'await runtimeTransport.DisconnectAsync();',
-    'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} install")',
-    'ValidatePowerShellScriptSyntax(ps1Path, $"{config.LogName} {operationName}")',
-    'TimeSpan.FromMinutes(20)',
-    'process.Kill(entireProcessTree: true)',
-    'none of the current states for variant={driverVariant.Name}'
-)
-
-foreach ($fragment in $requiredPortableTargets) {
-    if ($source.IndexOf($fragment, [System.StringComparison]::Ordinal) -lt 0) {
-        throw "Required portable driver target is missing: $fragment"
-    }
-}
-
-$pid3A04Mi04 = $source.IndexOf('new DriverBinding("0x3A04", 4, "interface 4 (MI_04)")', [System.StringComparison]::Ordinal)
-$pid3A04Mi03 = $source.IndexOf('new DriverBinding("0x3A04", 3, "interface 3 (MI_03)")', [System.StringComparison]::Ordinal)
-$pid3A04Mi00 = $source.IndexOf('new DriverBinding("0x3A04", 0, "interface 0 (MI_00)")', [System.StringComparison]::Ordinal)
-if (-not ($pid3A04Mi04 -lt $pid3A04Mi03 -and $pid3A04Mi03 -lt $pid3A04Mi00)) {
-    throw "VID_1B1C/PID_3A04 must install deterministically in MI_04, MI_03, MI_00 order."
-}
-
-if ($source -match 'WINUSB detected on .*Stopping the unresponsive wdi-simple process') {
-    throw "wdi-simple must be allowed to finish package installation after WinUSB first appears."
-}
-
-if ($source -match 'PnP strong re-enumeration remove exact MI_03') {
-    throw "A successful receiver binding must be restarted, not removed, during convergence."
-}
-
-if ($source -match 'new DriverBinding\([^\r\n]*[A-Fa-f0-9]{64}') {
-    throw "Machine-derived driver fingerprints must not be stored in driver target configuration."
-}
-
-if ($source -match 'Get-PnpDevice[^\r\n]*-InstanceId[^\r\n]*\*') {
-    throw "Get-PnpDevice -InstanceId does not support wildcard matching; enumerate present devices and filter InstanceId instead."
-}
-
-if ($source -match '\$null -ne \$candidateDevices') {
-    throw "An empty PowerShell array is not null; PID selection must require at least one matching present device."
-}
-
-if ($source -match 'new DriverBinding\(\"0x3A09\",\s*[0-9]') {
-    throw "PID 3A09 is a whole-device HID receiver state and must not be installed as a composite MI interface."
-}
-
-if ($source -match 'new DriverBinding\(\"0x3A08\",\s*0') {
-    throw "PID 3A08 MI_00 is not a receiver transport and must only appear as an obsolete migration target."
-}
-
-if ($source -match 'new DriverBinding\(\"0x434E\",\s*(0|null)') {
-    throw "PID 434E V1 MI_00 and the composite parent must never be replaced with WinUSB."
-}
-
-if ($source -match 'new DriverBinding\(\"0x5046\",\s*[0-9]') {
-    throw "PID 5046 is modeled as the V1 whole-device active state and must not be installed as a composite MI interface."
-}
-
-foreach ($wiredV1Pid in @("434B", "434D")) {
-    $bindingPatternPrefix = 'new DriverBinding\("0x{0}",\s*' -f $wiredV1Pid
-    if ($source -notmatch ($bindingPatternPrefix + '0') -or
-        $source -notmatch ($bindingPatternPrefix + '3') -or
-        $source -notmatch ($bindingPatternPrefix + '4')) {
-        throw "Experimental wired V1 PID $wiredV1Pid must remain scoped to MI_00, MI_03, and MI_04."
-    }
-}
-
-if ($source -match 'Read-Host') {
-    throw "The elevated driver workflow must not block indefinitely waiting for console input."
-}
-
-$requiredV1RuntimeFragments = @(
-    'new WiredDeviceIdentity(0x1B1C, 0x3A05, "Envision Pro wired controller V2", false)',
-    'new WiredDeviceIdentity(0x1B1C, 0x3A04, "Envision wired controller V2", true)',
-    'new WiredDeviceIdentity(0x2E95, 0x434D, "SCUF Envision Pro wired controller V1", true)',
-    'new WiredDeviceIdentity(0x2E95, 0x434B, "SCUF Envision wired controller V1", true)',
-    'WiredDeviceIdentities.Any',
-    'FindWiredDevice(dev.VendorId, dev.ProductId)',
-    'new WirelessReceiverIdentity(0x1B1C, 0x3A08, "Envision Pro Wireless USB Receiver V2 (base)", false, true, 0x02, 0x82, true)',
-    'new WirelessReceiverIdentity(0x1B1C, 0x3A09, "Envision Pro Wireless USB Receiver V2 (active)", false, false, 0x01, 0x81, false)',
-    'new WirelessReceiverIdentity(0x2E95, 0x434E, "SCUF PC Controller Dongle V1 (base)", true, true, 0x02, 0x82, true)',
-    'new WirelessReceiverIdentity(0x2E95, 0x5046, "SCUF PC Controller Dongle V1 (active)", true, false, 0x01, 0x81, false)',
-    'WirelessReceiverIdentities.Any',
-    'receiverIdentity: receiverIdentity',
-    'SelectedReceiverIdentity = candidate.Identity',
-    'receiverIdentity: selectedReceiverIdentity',
-    'IsTargetCompatibleCandidate',
-    'Ignoring non-interface WinUSB candidate',
-    'candidate.Identity.UsesCompositeInterfaces',
-    'candidate.Identity.UsesUnifiedActiveTransport',
-    'identity.ControlOutPipe',
-    'identity.ControlInPipe',
-    'selectedReceiverIdentity?.UsesDedicatedRadioInterface == true',
-    'A single runtime reader is enforced; no auxiliary radio handle will be opened.',
-    'MaxEnumerationAttempts = 8',
-    'WirelessWinUsbInterfaceTarget.RadioMi03 =>',
-    'WirelessWinUsbInterfaceTarget.RuntimeMi04 =>'
-)
-
-$runtimeSources = $source + $profileSource + $wiredServiceSource + $transportSource + $probeSource
-foreach ($fragment in $requiredV1RuntimeFragments) {
-    if ($runtimeSources.IndexOf($fragment, [System.StringComparison]::Ordinal) -lt 0) {
-        throw "Required V1 runtime receiver boundary is missing: $fragment"
-    }
-}
-
-Write-Host "Driver restoration is limited to manifest-owned packages or legacy packages with the exact portable INF signature, hardware IDs, and PnP instances."
+Write-Host "Driver safety boundaries verified."

@@ -3372,53 +3372,36 @@ namespace ZeroCue.DataProbe.ViewModels
                 await Task.Delay(500);
 
                 var service = new Services.DriverAutomationService();
-                bool success = false;
+                var progress = new Progress<string>(message => ProcessingMessage = message);
+                Services.Drivers.DriverOperationResult result;
+                var action = _pendingAction;
 
-                if (_pendingAction == PendingDriverAction.Install)
+                switch (action)
                 {
-                    ProcessingMessage = LocalizationService.Get("ProcessingInstallDriver");
-                    success = await service.InstallWinUsbDriversAsync();
-                }
-                else if (_pendingAction == PendingDriverAction.Restore)
-                {
-                    ProcessingMessage = LocalizationService.Get("ProcessingRestoreDriver");
-                    success = await service.RestoreDefaultDriversAsync();
-                }
-                else if (_pendingAction == PendingDriverAction.InstallReceiver)
-                {
-                    ProcessingMessage = LocalizationService.Get("ProcessingInstallReceiver");
-                    success = await service.InstallReceiverWinUsbDriversAsync();
-                }
-                else if (_pendingAction == PendingDriverAction.RestoreReceiver)
-                {
-                    ProcessingMessage = LocalizationService.Get("ProcessingRestoreReceiver");
-                    success = await service.RestoreReceiverDefaultDriversAsync();
+                    case PendingDriverAction.Install:
+                        ProcessingMessage = LocalizationService.Get("ProcessingInstallDriver");
+                        result = await service.InstallAsync(Services.Drivers.DriverTarget.Gamepad, progress);
+                        break;
+                    case PendingDriverAction.Restore:
+                        ProcessingMessage = LocalizationService.Get("ProcessingRestoreDriver");
+                        result = await service.RestoreAsync(Services.Drivers.DriverTarget.Gamepad, progress);
+                        break;
+                    case PendingDriverAction.InstallReceiver:
+                        ProcessingMessage = LocalizationService.Get("ProcessingInstallReceiver");
+                        result = await service.InstallAsync(Services.Drivers.DriverTarget.Receiver, progress);
+                        break;
+                    default:
+                        ProcessingMessage = LocalizationService.Get("ProcessingRestoreReceiver");
+                        result = await service.RestoreAsync(Services.Drivers.DriverTarget.Receiver, progress);
+                        break;
                 }
 
                 IsProcessing = false;
                 SetDriverModalState(false, false, true);
-
-                if (success)
-                {
-                    IsDriverModalResultSuccess = true;
-                    IsDriverModalResultError = false;
-                    DriverModalTitle = LocalizationService.Get("OperationCompleted");
-                    if (_pendingAction == PendingDriverAction.Install)
-                        DriverModalDescription = LocalizationService.Get("DriverInstalledSuccess");
-                    else
-                        DriverModalDescription = LocalizationService.Get("DriversRemovedSuccess");
-                    if (_pendingAction == PendingDriverAction.InstallReceiver)
-                        DriverModalDescription = LocalizationService.Get("ReceiverDriverInstalledSuccess");
-                    else if (_pendingAction == PendingDriverAction.RestoreReceiver)
-                        DriverModalDescription = LocalizationService.Get("ReceiverDriversRemovedSuccess");
-                }
-                else
-                {
-                    IsDriverModalResultSuccess = false;
-                    IsDriverModalResultError = true;
-                    DriverModalTitle = LocalizationService.Get("OperationFailed");
-                    DriverModalDescription = LocalizationService.Get("OperationFailedDescription");
-                }
+                IsDriverModalResultSuccess = result.Succeeded;
+                IsDriverModalResultError = !result.Succeeded;
+                DriverModalTitle = LocalizationService.Get(result.Succeeded ? "OperationCompleted" : "OperationFailed");
+                DriverModalDescription = DescribeDriverResult(action, result);
             }
             catch (Exception ex)
             {
@@ -3433,6 +3416,63 @@ namespace ZeroCue.DataProbe.ViewModels
             {
                 _pendingAction = PendingDriverAction.None;
             }
+        }
+
+        private string DescribeDriverResult(PendingDriverAction action, Services.Drivers.DriverOperationResult result)
+        {
+            if (result.Status == Services.Drivers.DriverOperationStatus.NoDevice)
+            {
+                var presence = _service.LastPresence;
+                if (result.Target == Services.Drivers.DriverTarget.Gamepad && presence.Receiver != null)
+                {
+                    return LocalizationService.Get("DriverResultNoDeviceReceiverPresent");
+                }
+
+                if (result.Target == Services.Drivers.DriverTarget.Receiver && presence.Wired != null)
+                {
+                    return LocalizationService.Get("DriverResultNoDeviceWiredPresent");
+                }
+            }
+
+            string text = result.Status switch
+            {
+                Services.Drivers.DriverOperationStatus.Success or Services.Drivers.DriverOperationStatus.SuccessWithWarnings => action switch
+                {
+                    PendingDriverAction.Install => LocalizationService.Get("DriverInstalledSuccess"),
+                    PendingDriverAction.InstallReceiver => LocalizationService.Get("ReceiverDriverInstalledSuccess"),
+                    PendingDriverAction.RestoreReceiver => LocalizationService.Get("ReceiverDriversRemovedSuccess"),
+                    _ => LocalizationService.Get("DriversRemovedSuccess")
+                },
+                Services.Drivers.DriverOperationStatus.Cancelled => LocalizationService.Get("DriverResultCancelled"),
+                Services.Drivers.DriverOperationStatus.NoDevice => LocalizationService.Get("DriverResultNoDevice"),
+                Services.Drivers.DriverOperationStatus.DeviceError => string.Format(
+                    LocalizationService.Get("StatusDeviceErrorFormat"),
+                    LocalizationService.Get(result.Target == Services.Drivers.DriverTarget.Receiver ? "DeviceNameReceiver" : "DeviceNameWired"),
+                    result.ProblemCode),
+                Services.Drivers.DriverOperationStatus.Busy => LocalizationService.Get("DriverResultBusy"),
+                Services.Drivers.DriverOperationStatus.TimedOut => LocalizationService.Get("DriverResultTimedOut"),
+                Services.Drivers.DriverOperationStatus.HelperUnavailable => LocalizationService.Get("DriverResultHelperUnavailable"),
+                _ => result.Errors.Count > 0
+                    ? string.Format(LocalizationService.Get("DriverResultFailedFormat"), result.Errors[0])
+                    : LocalizationService.Get("OperationFailedDescription")
+            };
+
+            if (result.ReconnectRequired)
+            {
+                text += Environment.NewLine + LocalizationService.Get(
+                    result.Target == Services.Drivers.DriverTarget.Receiver ? "DriverResultReconnectReceiver" : "DriverResultReconnectWired");
+            }
+            else if (result.Status == Services.Drivers.DriverOperationStatus.SuccessWithWarnings && result.Warnings.Count > 0)
+            {
+                text += Environment.NewLine + string.Format(LocalizationService.Get("DriverResultWarningsFormat"), result.Warnings[0]);
+            }
+
+            if (result.RebootRequired)
+            {
+                text += Environment.NewLine + LocalizationService.Get("DriverResultRebootRequired");
+            }
+
+            return text;
         }
 
         private async Task ConnectAsync()

@@ -431,6 +431,9 @@ namespace ZeroCue.DataProbe.Services
                         LocalizationService.Get("StatusControllerConnected"),
                         LocalizationService.Get("StatusControllerActive"));
                     break;
+                case ConnectionStatusState.Error when !IsConnected && LastPresence.Devices.Count > 0:
+                    ApplyPresenceStatus(LastPresence);
+                    break;
             }
         }
 

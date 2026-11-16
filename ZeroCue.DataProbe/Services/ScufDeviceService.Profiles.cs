@@ -40,7 +40,7 @@ namespace ZeroCue.DataProbe.Services
                         _closeBehavior = settings.CloseBehavior;
                         _askBeforeClosing = settings.AskBeforeClosing;
                         _defaultProfileName = string.IsNullOrWhiteSpace(settings.DefaultProfileName) ? "Default" : settings.DefaultProfileName.Trim();
-                        WindowsStartupService.Configure(_startWithWindows, _startMinimized);
+                        WindowsStartupService.RepairIfStale(_startWithWindows, _startMinimized);
                     }
                 }
             }

@@ -32,6 +32,8 @@ public partial class App : Application
             }
 
             desktop.MainWindow = mainWindow;
+            SingleInstanceGuard.Current?.ListenForShowRequests(() =>
+                Avalonia.Threading.Dispatcher.UIThread.Post(RestoreMainWindow));
         }
 
         base.OnFrameworkInitializationCompleted();

@@ -383,12 +383,16 @@ namespace ZeroCue.DataProbe.Services
 
         private async Task PlayMacroAsync(string macroTarget, MacroDefinition macro, CancellationToken token)
         {
-            var ownedOutputs = new HashSet<string>();
+            // Every Down increments a shared reference count, so release exactly as many
+            // as this playback added; a set here left keys stuck when a step pressed the
+            // same key twice or a repeating macro had no matching Up.
+            var ownedOutputs = new Dictionary<string, int>();
 
             try
             {
                 do
                 {
+                    bool waited = false;
                     foreach (var step in macro.Steps)
                     {
                         token.ThrowIfCancellationRequested();
@@ -399,21 +403,40 @@ namespace ZeroCue.DataProbe.Services
                         }
 
                         var isDown = step.Action != MacroActions.Up;
-                        SetMacroOutput(target, isDown);
                         if (isDown)
                         {
-                            ownedOutputs.Add(target);
+                            SetMacroOutput(target, true);
+                            ownedOutputs[target] = ownedOutputs.GetValueOrDefault(target) + 1;
+                        }
+                        else if (ownedOutputs.TryGetValue(target, out var count) && count > 0)
+                        {
+                            SetMacroOutput(target, false);
+                            if (count == 1)
+                            {
+                                ownedOutputs.Remove(target);
+                            }
+                            else
+                            {
+                                ownedOutputs[target] = count - 1;
+                            }
                         }
                         else
                         {
-                            ownedOutputs.Remove(target);
+                            SetMacroOutput(target, false);
                         }
 
                         var delay = Math.Clamp(step.DelayMs, 0, 60000);
                         if (delay > 0)
                         {
                             await Task.Delay(delay, token);
+                            waited = true;
                         }
+                    }
+
+                    // A repeating macro without delays would otherwise spin a CPU core.
+                    if (!waited && macro.RepeatWhileHeld)
+                    {
+                        await Task.Delay(16, token);
                     }
                 }
                 while (macro.RepeatWhileHeld && IsMacroTriggerHeld(macroTarget, token));
@@ -423,9 +446,12 @@ namespace ZeroCue.DataProbe.Services
             }
             finally
             {
-                foreach (var target in ownedOutputs.ToArray())
+                foreach (var (target, count) in ownedOutputs)
                 {
-                    SetMacroOutput(target, false);
+                    for (int i = 0; i < count; i++)
+                    {
+                        SetMacroOutput(target, false);
+                    }
                 }
 
                 lock (_macroPlaybackLock)
@@ -532,6 +558,82 @@ namespace ZeroCue.DataProbe.Services
                 {
                     _macroOutputRefs[target] = currentCount;
                 }
+            }
+        }
+
+        private readonly object _syntheticOutputGate = new();
+
+        private void SubmitKeyboardOutput()
+        {
+            lock (_syntheticOutputGate)
+            {
+                foreach (var target in _frameTargets)
+                {
+                    if (!_previousFrameTargets.Contains(target) && !IsXboxButton(target))
+                    {
+                        KeyboardSimulator.KeyDown(target);
+                    }
+                }
+
+                foreach (var oldTarget in _previousFrameTargets)
+                {
+                    if (!_frameTargets.Contains(oldTarget) && !IsXboxButton(oldTarget))
+                    {
+                        KeyboardSimulator.KeyUp(oldTarget);
+                    }
+                }
+
+                _previousFrameTargets.Clear();
+                foreach (var target in _frameTargets)
+                {
+                    _previousFrameTargets.Add(target);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Releases every key and mouse button ZeroCue is holding and stops macros.
+        /// Called from every teardown path: without it, a mapped key held while the
+        /// cable was pulled or the app closed stayed pressed in Windows.
+        /// </summary>
+        public void ReleaseAllSyntheticOutputs(string reason)
+        {
+            int released = 0;
+            lock (_macroPlaybackLock)
+            {
+                foreach (var cts in _macroPlaybackCancellations.Values)
+                {
+                    try { cts.Cancel(); } catch (ObjectDisposedException) { }
+                }
+
+                _heldMacroTargets.Clear();
+                _macroOutputRefs.Clear();
+                _macroFrameTargets.Clear();
+            }
+
+            lock (_syntheticOutputGate)
+            {
+                foreach (var target in _previousFrameTargets)
+                {
+                    if (!IsXboxButton(target))
+                    {
+                        try
+                        {
+                            KeyboardSimulator.KeyUp(target);
+                            released++;
+                        }
+                        catch
+                        {
+                        }
+                    }
+                }
+
+                _previousFrameTargets.Clear();
+            }
+
+            if (released > 0)
+            {
+                LogInput($"[INPUT] Released {released} synthetic key/mouse output(s) reason={reason}.");
             }
         }
 
@@ -1254,6 +1356,10 @@ namespace ZeroCue.DataProbe.Services
             short rightStickX,
             short rightStickY)
         {
+            // Keyboard and mouse mappings must work (and release) even when ViGEm is
+            // unavailable or a virtual report fails.
+            SubmitKeyboardOutput();
+
             if (_xbox == null)
             {
                 return;
@@ -1303,27 +1409,6 @@ namespace ZeroCue.DataProbe.Services
             if (outputSummary != null) LogInput(outputSummary);
             VerifyXInputOutput(xinputButtons, vigemButtons, leftTriggerOut, rightTriggerOut);
 
-            foreach (var target in _frameTargets)
-            {
-                if (!_previousFrameTargets.Contains(target) && !IsXboxButton(target))
-                {
-                    KeyboardSimulator.KeyDown(target);
-                }
-            }
-
-            foreach (var oldTarget in _previousFrameTargets)
-            {
-                if (!_frameTargets.Contains(oldTarget) && !IsXboxButton(oldTarget))
-                {
-                    KeyboardSimulator.KeyUp(oldTarget);
-                }
-            }
-
-            _previousFrameTargets.Clear();
-            foreach (var target in _frameTargets)
-            {
-                _previousFrameTargets.Add(target);
-            }
 
             LogVigemChanges(
                 _frameTargets.Contains("A"),

@@ -68,6 +68,61 @@ namespace ZeroCue.DataProbe.Services
             ClearStartupApprovalOverride();
         }
 
+        /// <summary>
+        /// Called on every launch. It only repairs a registration whose executable no
+        /// longer exists (the portable folder was moved). It never re-enables an entry
+        /// the user disabled in Task Manager and never points autostart at whatever
+        /// build happens to be running.
+        /// </summary>
+        public static void RepairIfStale(bool enabled, bool startMinimized)
+        {
+            if (!enabled)
+            {
+                return;
+            }
+
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
+                if (key?.GetValue(ValueName) is not string command || string.IsNullOrWhiteSpace(command))
+                {
+                    return;
+                }
+
+                var registeredPath = ExtractExecutablePath(command);
+                if (registeredPath == null || System.IO.File.Exists(registeredPath))
+                {
+                    return;
+                }
+
+                var executablePath = Environment.ProcessPath;
+                if (string.IsNullOrWhiteSpace(executablePath))
+                {
+                    return;
+                }
+
+                var repaired = $"\"{executablePath}\"" + (startMinimized ? $" {MinimizedArgument}" : string.Empty);
+                key.SetValue(ValueName, repaired, RegistryValueKind.String);
+            }
+            catch
+            {
+                // Autostart repair is best effort.
+            }
+        }
+
+        private static string? ExtractExecutablePath(string command)
+        {
+            command = command.Trim();
+            if (command.StartsWith('"'))
+            {
+                var end = command.IndexOf('"', 1);
+                return end > 1 ? command[1..end] : null;
+            }
+
+            var space = command.IndexOf(' ');
+            return space > 0 ? command[..space] : command;
+        }
+
         private static void ClearStartupApprovalOverride()
         {
             using var key = Registry.CurrentUser.OpenSubKey(StartupApprovedRunKeyPath, writable: true);
